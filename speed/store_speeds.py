@@ -1,9 +1,10 @@
-
+from __future__ import print_function
 import os
 from glob import glob
 import subprocess
 import argparse
 import json
+import sys
 
 
 class ChangeDir(object):
@@ -22,35 +23,55 @@ class ChangeDir(object):
         os.chdir(self.old_dir)
 
 
-
-def summarize_runtimes():
-    '''Read all *.time files and extract the user time'''
-    timenames = glob("*/*.time")
-    timenames.sort()
-
-    host = os.getenv('HOST', 'unknown host')
-
-    times = []
-    for t in timenames:
-        with open(t, 'r') as f:
-            time = f.readline().split('u')[0]
-            times.append([host,
-                          os.path.basename(t),
-                          os.path.basename(os.path.dirname(t)),
-                          time])
-    return times
-
-
 def get_immidiate_subdirs():
     return next(os.walk('.'))[1]
 
 
 def checkout_hash(directory, githash):
-    with ChangeDir(os.path.join(directory, 'dist')):
-        subprocess.call(['git', 'fetch'])
-        subprocess.call(['git', 'checkout', githash])
-        subprocess.call(['make', '-j{0}'.format(args.j)])
-        subprocess.call(['make', 'install'])
+    with open(os.devnull, 'wb', 0) as DEVNULL:
+        with ChangeDir(os.path.join(directory, 'dist')):
+            print('{0}: git fetch'.format(directory), end=', ')
+            sys.stdout.flush()
+            subprocess.call(['git', 'fetch'],
+                            stdout=DEVNULL, stderr=subprocess.STDOUT)
+            print('git checkout', end=', ')
+            sys.stdout.flush()
+            subprocess.call(['git', 'checkout', githash],
+                            stdout=DEVNULL, stderr=subprocess.STDOUT)
+            print('make', end=', ')
+            sys.stdout.flush()
+            subprocess.call(['make', '-j{0}'.format(args.j)],
+                            stdout=DEVNULL, stderr=subprocess.STDOUT)
+            print('make install')
+            sys.stdout.flush()
+            subprocess.call(['make', 'install'],
+                            stdout=DEVNULL, stderr=subprocess.STDOUT)
+
+
+def time_command(cmd):
+    '''time a command, e.g. >>> time_command(['ls', '-l'])'''
+    with open(os.devnull, 'wb', 0) as DEVNULL:
+        p = subprocess.Popen(cmd, stdout=DEVNULL, stderr=subprocess.STDOUT)
+        ru = os.wait4(p.pid, 0)[2]
+    return ru.ru_utime + ru.ru_stime
+
+
+def execute_timing_tests(parpath, hostname, githash):
+    times = []
+    allpar = glob(os.path.join(parpath, '*.par'))
+    allpar = [os.path.abspath(a) for a in allpar]
+    for env in get_immidiate_subdirs():
+        print('Running timing tests in {0}'.format(env), end=' ')
+        with ChangeDir(env):
+            for par in allpar:
+                runtime = time_command(['install/bin/marx',
+                                        '@@{0}'.format(par)])
+                times.append([hostname, githash,
+                              env, os.path.basename(par)[:-4], runtime])
+                print('.',end="")
+                sys.stdout.flush()
+        print('')
+    return times
 
 
 parser = argparse.ArgumentParser(description='''Execute speed test for certain git commit.
@@ -76,6 +97,8 @@ parser.add_argument('githash', type=str,
                     help='hash for the git commit')
 parser.add_argument('file', type=str,
                     help='filename to save results')
+parser.add_argument('parpath', type=str,
+                    help='path to marx .par files')
 parser.add_argument('-j', type=int, default=1,
                     help='number of jobs that make runs simultaneously')
 
@@ -84,8 +107,9 @@ args = parser.parse_args()
 for d in get_immidiate_subdirs():
     checkout_hash(d, args.githash)
 
-subprocess.call(['make', '-j{0}'.format(args.j), 'subdirs'])
-times = summarize_runtimes()
+host = os.getenv('HOST', 'unknown host')
+times = execute_timing_tests(args.parpath, args.githash, host)
+
 
 # read jsonfile if it exists
 try:
