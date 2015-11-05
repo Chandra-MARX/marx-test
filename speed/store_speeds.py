@@ -32,8 +32,8 @@ def checkout_hash(directory, githash):
         with ChangeDir(os.path.join(directory, 'dist')):
             print('{0}: git fetch'.format(directory), end=', ')
             sys.stdout.flush()
-            subprocess.call(['git', 'fetch'],
-                            stdout=DEVNULL, stderr=subprocess.STDOUT)
+            subprocess.call(['git', 'fetch']),
+                            # stdout=DEVNULL, stderr=subprocess.STDOUT)
             print('git checkout', end=', ')
             sys.stdout.flush()
             subprocess.call(['git', 'checkout', githash],
@@ -73,8 +73,8 @@ def execute_timing_tests(parpath, hostname, githash):
         print('')
     return times
 
-
-parser = argparse.ArgumentParser(description='''Execute speed test for certain git commit.
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='''Execute speed test for certain git commit.
 
 This script needs to be run in a directory that contains one subdirectory
 for each environment (combination of compiler and compilation options).
@@ -93,35 +93,35 @@ env2/install
 Furthermore, the root directory must have a "Makefile" that contains a
 target "subdirs" to run the speed tests.
 ''')
-parser.add_argument('githash', type=str,
-                    help='hash for the git commit')
-parser.add_argument('file', type=str,
-                    help='filename to save results')
-parser.add_argument('parpath', type=str,
-                    help='path to marx .par files')
-parser.add_argument('-j', type=int, default=1,
-                    help='number of jobs that make runs simultaneously')
+    parser.add_argument('githash', type=str,
+                        help='hash for the git commit')
+    parser.add_argument('file', type=str,
+                        help='filename to save results')
+    parser.add_argument('parpath', type=str,
+                        help='path to marx .par files')
+    parser.add_argument('-j', type=int, default=1,
+                        help='number of jobs that make runs simultaneously')
 
-args = parser.parse_args()
+    args = parser.parse_args()
 
-for d in get_immidiate_subdirs():
-    checkout_hash(d, args.githash)
+    for d in get_immidiate_subdirs():
+        checkout_hash(d, args.githash)
 
-host = os.getenv('HOST', 'unknown host')
-times = execute_timing_tests(args.parpath, args.githash, host)
+    host = os.getenv('HOST', 'unknown host')
+    times = execute_timing_tests(args.parpath, args.githash, host)
 
 
-# read jsonfile if it exists
-try:
-    with open(args.file, 'r') as jsonfile:
-        timetabs = json.load(jsonfile)
-except IOError:
-    # file not present yet
-    timetabs = []
+    # read jsonfile if it exists
+    try:
+        with open(args.file, 'r') as jsonfile:
+            timetabs = json.load(jsonfile)
+    except IOError:
+        # file not present yet
+        timetabs = []
 
-# add new data
-timetabs.extend(times)
+    # add new data
+    timetabs.extend(times)
 
-# save file
-with open(args.file, 'w') as jsonfile:
-    json.dump(timetabs, jsonfile)
+    # save file
+    with open(args.file, 'w') as jsonfile:
+        json.dump(timetabs, jsonfile)
