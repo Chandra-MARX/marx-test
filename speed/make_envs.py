@@ -4,7 +4,7 @@ import subprocess
 import argparse
 import json
 
-from store_speeds import ChangeDir
+from ..utils import ChangeDir
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='''Create environments for MARX testing\n
