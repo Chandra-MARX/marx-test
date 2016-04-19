@@ -4,7 +4,7 @@ import sys
 import os
 import subprocess
 import re
-
+import numpy as np
 import ftputil
 
 
@@ -121,3 +121,18 @@ def download_chandra(obsid, targetdir, products=None):
         host.chdir('../secondary')
         _copy_into_dir(host, os.path.join(targetdir, 'secondary'), products)
 
+
+def find_centroid(x, x0, width, func=np.mean):
+    '''Find centroid of a distribution
+
+    Parameters
+    ----------
+    x : np.array
+    x0 : float
+        starting guess
+    width : float
+        use only data values in ``x0 - width, x0 + width``
+    func : callable
+    '''
+    ind = np.abs(x - x0) < width
+    return func(x[ind])
