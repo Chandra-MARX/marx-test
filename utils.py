@@ -13,13 +13,26 @@ import ftputil
 class ChangeDir(object):
     """ Context manager to step into a directory temporarily.
 
+    Parameters
+    ----------
+    directory : string
+        Directory to step into.
+
+    make_dir : boolean
+        If True, the directory is created should it not exist yet.
+
     See: https://pythonadventures.wordpress.com/2013/12/15/chdir-a-context-manager-for-switching-working-directories/
     """
-    def __init__(self, directory):
+    def __init__(self, directory, make_dir=True):
         self.old_dir = os.getcwd()
         self.new_dir = directory
+        self.make_dir = make_dir
 
     def __enter__(self):
+        if self.make_dir:
+            if not os.path.exists(self.new_dir):
+                os.makedirs(self.new_dir)
+
         os.chdir(self.new_dir)
 
     def __exit__(self, *args):
