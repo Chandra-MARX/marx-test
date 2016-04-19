@@ -4,6 +4,8 @@ import sys
 import os
 import subprocess
 import re
+import shutil
+import gzip
 import numpy as np
 import ftputil
 
@@ -85,14 +87,22 @@ def _name_matches(name, products):
 
 
 def _copy_into_dir(host, t_dir, products):
-    '''copy products from current host dir into t_dir'''
+    '''copy products from current host dir into t_dir
+
+    Unzip all file ending on gz
+    '''
     names = host.listdir(host.curdir)
     for name in names:
         if host.path.isfile(name) and _name_matches(name, products):
             if not os.path.exists(t_dir):
                 os.makedirs(t_dir)
             # Remote name, local name, binary mode
-            host.download(name, os.path.join(t_dir, name))
+            outname = os.path.join(t_dir, name)
+            host.download(name, outname)
+            if name[-3:] == '.gz':
+                with gzip.open(outname, 'rb') as f_in, open(outname[:-3], 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+                os.remove(outname)
 
 
 def download_chandra(obsid, targetdir, products=None):
