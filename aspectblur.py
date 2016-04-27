@@ -1,5 +1,6 @@
 from copy import deepcopy
 import os
+import stat
 import subprocess
 from glob import glob
 
@@ -66,22 +67,66 @@ with ChangeDir(outputdir):
                  'TStart': asol.meta['TSTART'],
                  }
 
+    saotrace_lua = '''
+ra_pnt = {ra_pnt}
+dec_pnt = {dec_pnt}
+roll_pnt = {roll_pnt}
+
+dither_asol_chandra{{ file = "{asolfile}",
+                     ra = ra_pnt, dec = dec_pnt, roll = roll_pnt }}
+
+point{{ position = {{ ra = {ra},
+          dec = {dec},
+          ra_aimpt = ra_pnt,
+          dec_aimpt = dec_pnt,
+       }},
+       spectrum = {{ {{ file = "Obsid15713_source_flux_saotrace.rdb",
+                      units = "photons/s/cm2",
+                      scale = 1,
+                      format = "rdb",
+                      emin = "ENERG_LO",
+                      emax = "ENERG_HI",
+                      flux = "FLUX"}} }}
+    }}
+'''.format(ra_pnt=asol.meta['RA_NOM'], dec_pnt=asol.meta['DEC_NOM'],
+           roll_pnt=asol.meta['ROLL_NOM'], asolfile=asolfile,
+           ra=skyco.ra.value, dec=skyco.dec.value)
+
+    with open('saotrace.lua', 'w') as f:
+        f.write(saotrace_lua)
+
     for i in range(10):
         name = 'marxrun{0}'.format(i)
         mpars = deepcopy(marx_pars)
         mpars['OutputDir'] = name
         call_marx(**mpars)
+
+        # setup script is only written for bash ...
+        saotrace_sh = '''
+trace-nest tag=saotracerun{i} srcpars=saotrace.lua tstart={tstart} limit_type=sec limit={exptime}'''.format(exptime=asol.meta['TSTOP'] - asol.meta['TSTART'], i=i, tstart=asol.meta['TSTART'])
+        with open('saotrace.sh', 'w') as f:
+            f.write(saotrace_sh)
+
+        os.chmod('saotrace.sh', stat.S_IXUSR |stat.S_IRUSR |stat.S_IWUSR )
+        subprocess.check_call(['/melkor/d1/guenther/marx/doc/source/examples/runsaotracetool.sh', './saotrace.sh'])
+
+        mpars['SourceType'] = "SAOSAC"
+        mpars['SAOSACFile'] = 'saotracerun{0}.fits'.format(i)
+        mpars['OutputDir'] = 'saotracerun{0}'.format(i)
+        call_marx(**mpars)
         # subprocess.check_call([os.path.join(marxdir, 'marxpileup'),
         #                        'MarxOutputDir={0}'.format(name),
         #                        'FrameTime=0.4'])
-        subprocess.check_call([os.path.join(marxdir, 'marx2fits'),
-                               '--pixadj=EDSER',
-                               os.path.join(name),
-                               name + '.fits'])
-        subprocess.check_call([os.path.join(marxdir, 'marx2fits'),
-                               '--pixadj=RANDOMIZE',
-                               name,
-                               name + 'rand.fits'])
+        for prog in ['marx', 'saotrace']:
+            name = '{0}run{1}'.format(prog, i)
+            subprocess.check_call([os.path.join(marxdir, 'marx2fits'),
+                                   '--pixadj=EDSER',
+                                   os.path.join(name),
+                                   name + 'edser.fits'])
+            subprocess.check_call([os.path.join(marxdir, 'marx2fits'),
+                                   '--pixadj=RANDOMIZE',
+                                   name,
+                                   name + 'rand.fits'])
 
 with ChangeDir(outputdir):
 
@@ -153,3 +198,6 @@ with ChangeDir(outputdir):
                 plotargs = {'color': c}
             plt.plot(0.1 + edges[:-1], 1.0 * val.cumsum() / val.sum(), **plotargs)
             # plt.plot(0.1 + edges[:-1], val, **plotargs)
+
+for i in range(10):
+    print 'acis_process_events marxrun{0}rand.fits mr{0}aprand.fits doevtgrade=no calculate_pi=no pix_adj=EDSER acaofffile=15713/primary/pcadf508966864N002_asol1.fits'.format(i)
