@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
 
-from utils import ChangeDir, download_chandra, call_marx, find_centroid
+from ..utils import ChangeDir, download_chandra, call_marx, find_centroid
 
 marxdir = '/nfs/melkor/d1/guenther/marx/installed/dev/bin/'
 outputdir = '/nfs/melkor/d1/guenther/marx/test/aspectblur/'
@@ -26,8 +26,6 @@ marx_pars = {'marxdir': marxdir, 'parfile': parfile,
              }
 
 obsid = '13182'  # AR Lac  HRC-I
-
-# this is an open cluster - not a point source!
 obsid = '4469'   # tau Canis Major - ACIS-I
 
 ''' TYC
@@ -49,17 +47,17 @@ obsid = '15713'
 with ChangeDir(outputdir):
 
     ### Uncomment the following line###
-    #download_chandra(obsid, obsid)
+    download_chandra(obsid, obsid)
 
     asolfile = glob(os.path.join(obsid, 'primary', '*asol*'))[0]
     asol = Table.read(asolfile)
 
     ## Uncomment the following line ###
-    # skyco = SkyCoord.from_name(asol.meta['OBJECT'].split('/')[0])
+    skyco = SkyCoord.from_name(asol.meta['OBJECT'].split('/')[0])
     # Set sensible default parameters
     marx_pars = {'marxdir': marxdir, 'parfile': parfile,
                  'SpectrumType': "FILE",
-                 'SpectrumFile': "/melkor/d1/guenther/marx/test/marx-test/Obsid15713_source_flux_marx.dat",
+                 'SpectrumFile': "/melkor/d1/guenther/marx/test/marx-test/aspectblur/Obsid15713_source_flux_marx.dat",
                  'SourceFlux': -1,
                  # keep things simple so that sky and det coos are aligned
                  'SourceRA': skyco.ra.value,
@@ -134,6 +132,22 @@ trace-nest tag=saotracerun{i} srcpars=saotrace.lua tstart={tstart} limit_type=se
                                    '--pixadj=RANDOMIZE',
                                    name,
                                    name + 'rand.fits'])
+            subprocess.check_call(['/melkor/d1/guenther/marx/doc/source/examples/runciaotool.sh',
+                                   'acis_process_events',
+                                   '{0}run{1}edser.fits'.format(prog, i),
+                                   '{0}{1}a_p_eedser.fits'.format(prog, i),
+                                   'doevtgrade=no', 'calculate_pi=no',
+                                   'pix_adj=EDSER',
+                                   'acaofffile=15713/primary/pcadf508966864N002_asol1.fits',
+                                   'clobber=yes'])
+            subprocess.check_call(['/melkor/d1/guenther/marx/doc/source/examples/runciaotool.sh',
+                                   'acis_process_events',
+                                   '{0}run{1}rand.fits'.format(prog, i),
+                                   '{0}{1}a_p_erand.fits'.format(prog, i),
+                                   'doevtgrade=no', 'calculate_pi=no',
+                                   'pix_adj=RANDOMIZE',
+                                   'acaofffile=15713/primary/pcadf508966864N002_asol1.fits',
+                                   'clobber=yes'])
 
 with ChangeDir(outputdir):
 
@@ -208,3 +222,5 @@ with ChangeDir(outputdir):
 
 for i in range(10):
     print 'acis_process_events marxrun{0}rand.fits mr{0}aprand.fits doevtgrade=no calculate_pi=no pix_adj=EDSER acaofffile=15713/primary/pcadf508966864N002_asol1.fits'.format(i)
+
+
