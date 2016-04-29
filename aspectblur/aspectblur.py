@@ -36,13 +36,20 @@ there is a little pile-up in the central pixel!
 sherpa> fluxdensity = get_source_plot(lo=0.3,hi=3.0).y
 sherpa> energy = get_source_plot(lo=0.3,hi=3.0).xhi
 sherpa> save_arrays("Obsid15713_source_flux_marx.dat",[energy,fluxdensity],["keV","photons/s/cm**2/keV"],ascii=True)
+
+From these, I also made the SAOtrace input.
+However, the scaling is not quite right because I mixed "* binwidth"
+and "/binwidhth". In order to correct for that the scale for the saotrace
+spectrum is set to 0.001.
+
+
 '''
 obsid = '15713'
 
 with ChangeDir(outputdir):
 
     ### Uncomment the following line###
-    download_chandra(obsid, obsid)
+    #download_chandra(obsid, obsid)
 
     asolfile = glob(os.path.join(obsid, 'primary', '*asol*'))[0]
     asol = Table.read(asolfile)
@@ -82,7 +89,7 @@ point{{ position = {{ ra = {ra},
        }},
        spectrum = {{ {{ file = "Obsid15713_source_flux_saotrace.rdb",
                       units = "photons/s/cm2",
-                      scale = 1,
+                      scale = 0.0001,
                       format = "rdb",
                       emin = "ENERG_LO",
                       emax = "ENERG_HI",
@@ -103,7 +110,7 @@ point{{ position = {{ ra = {ra},
 
         # setup script is only written for bash ...
         saotrace_sh = '''
-trace-nest tag=saotracerun{i} srcpars=saotrace.lua tstart={tstart} limit_type=sec limit={exptime}'''.format(exptime=asol.meta['TSTOP'] - asol.meta['TSTART'], i=i, tstart=asol.meta['TSTART'])
+trace-nest tag=saotracerun{i} srcpars=saotrace.lua tstart={tstart} limit_type=sec limit={exptime}'''.format(exptime=asol.meta['TSTOP'] - asol.meta['TSTART']-1, i=i, tstart=asol.meta['TSTART'])
         with open('saotrace.sh', 'w') as f:
             f.write(saotrace_sh)
 
