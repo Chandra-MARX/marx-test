@@ -159,3 +159,28 @@ def find_centroid(x, x0, width, func=np.mean):
     '''
     ind = np.abs(x - x0) < width
     return func(x[ind])
+
+
+def colname_case(table, name):
+    '''Extract a column from a Table case insensitive to the column name.
+
+    If several columns in the table match ``name`` in a case-insensitive way,
+    this just returns the first match.
+
+    Parameters
+    ----------
+    table : `astropy.table.Table`
+        Table with columns
+    name : string
+        column name, case insensitive.
+
+    Returns
+    -------
+    col : `astropy.table.Column`
+        Table column
+    '''
+    for n in table.colnames:
+        if name.lower() == n.lower():
+            return table[n]
+    else:
+        raise KeyError('{0} not found in {1}'.format(name, table.col_names))

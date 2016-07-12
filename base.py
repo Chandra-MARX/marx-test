@@ -90,10 +90,10 @@ class Marx(ExternalBaseWrapper):
                                         self.program))
         marxcall.insert(1, '@@{0}'.format(external_settings[self.program + 'parfile']))
 
-        return marxcall
+        return ' '.join(marxcall)
 
     def __call__(self, obj):
-        run_external(self.source(), cwd=obj.basepath)
+        run_external([self.source()], cwd=obj.basepath)
 
 
 class Marx2asp(Marx):
@@ -107,11 +107,11 @@ class Marx2fits(ExternalBaseWrapper):
     def source(self):
         '''Assemble string for marx2fits call'''
         options, marxdir, outfile = self.f(self.instance)
-        return ' '.join(os.path.join(external_settings['marxpath'], self.program),
-                        options, marxdir, outfile)
+        return ' '.join([os.path.join(external_settings['marxpath'], self.program),
+                         options, marxdir, outfile])
 
     def __call__(self, obj):
-        run_external(self.source(), cwd=obj.basepath)
+        run_external([self.source()], cwd=obj.basepath)
 
 
 class MarxTest(object):
@@ -141,6 +141,9 @@ class MarxTest(object):
 
     def __init__(self, env):
         self.env = env
+        self.env['outpath'] = os.path.abspath(env['outpath'])
+        self.basepath = os.path.abspath(os.path.join(self.env['temppath'],
+                                                     self.name))
         if hasattr(self, 'obsid') and self.download_all:
             download_chandra(self.obsid, self.datapath)
 
@@ -149,14 +152,14 @@ class MarxTest(object):
         return self.__class__.__name__
 
     @property
-    def basepath(self):
-        return os.path.join(self.env['temppath'], self.name)
-
-    @property
     def datapath(self):
         return os.path.join(self.basepath, 'download')
 
     def run(self, label, marxversion, ciaoversion):
+
+        if not os.path.exists(self.env['outpath']):
+                os.makedirs(self.env['outpath'])
+
         with ChangeDir(self.basepath):
             steplist = [method for method in dir(self) if (method[:5] == 'step_')]
             steplist.sort(key=lambda s: int(s.split('_')[1]))
@@ -179,9 +182,9 @@ class MarxTest(object):
 
     def marxpars_from_asol(self, asolfile):
 
-        asol = fits.getheader(asolfile)
+        asol = fits.getheader(asolfile, 1)
 
-        skyco = SkyCoord.from_name(asol.meta['OBJECT'].split('/')[0])
+        skyco = SkyCoord.from_name(asol['OBJECT'].split('/')[0])
         # Set sensible default parameters
         marx_pars = {
                      # keep things simple so that sky and det coos are aligned
