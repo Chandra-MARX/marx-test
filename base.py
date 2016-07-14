@@ -4,6 +4,8 @@ import inspect
 import types
 import subprocess
 from glob import glob
+from collections import OrderedDict
+import textwrap
 
 from .utils import download_chandra, ChangeDir
 from .run_external import external_settings
@@ -59,7 +61,15 @@ class Python(ExternalBaseWrapper):
     program = 'Python'
 
     def source(self):
-        return inspect.getsourcelines(self.f)[2:]
+        fsource = inspect.getsourcelines(self.f)[0][2:]
+        fsource = textwrap.dedent(''.join(fsource))
+        # find other functions defined in same module (e.g. plotting helpers)
+        for k, v in self.f.func_globals.iteritems():
+            if hasattr(v, '__module__') and v.__module__ == self.f.__module__:
+                # and if they are mentioned in the source code, list them, too.
+                if k in fsource:
+                    fsource = textwrap.dedent(''.join(inspect.getsourcelines(v)[0])) + '\n' + fsource
+        return fsource
 
     def __call__(self, obj):
         self.f(obj)
@@ -71,7 +81,7 @@ class Ciao(ExternalBaseWrapper):
     program = 'CIAO'
 
     def source(self):
-        return self.f(self.instance)
+        return '\n'.join(self.f(self.instance)).replace(self.instance.basepath + '/', '')
 
     def __call__(self, obj):
         run_external(self.f(obj), setup=self.program, cwd=obj.basepath)
@@ -83,17 +93,22 @@ class Marx(ExternalBaseWrapper):
     program = 'marx'
 
     def source(self):
-        '''Assemble string for marx call.'''
+        '''Assemble string for marx assuming everything is in the path.'''
+        par = self.f(self.instance)
+        marxcall = ['{0}={1}'.format(k, v) for k, v in par.iteritems()]
+        marxcall.insert(0, self.program)
+
+        return ' '.join(marxcall).replace(self.instance.basepath + '/', '')
+
+    def __call__(self, obj):
+        '''Assemble string for marxcall using path information from env.'''
         par = self.f(self.instance)
         marxcall = ['{0}={1}'.format(k, v) for k, v in par.iteritems()]
         marxcall.insert(0, os.path.join(external_settings['marxpath'],
                                         self.program))
         marxcall.insert(1, '@@{0}'.format(external_settings[self.program + 'parfile']))
 
-        return ' '.join(marxcall)
-
-    def __call__(self, obj):
-        run_external([self.source()], cwd=obj.basepath)
+        run_external([' '.join(marxcall)], cwd=obj.basepath)
 
 
 class Marx2asp(Marx):
@@ -105,13 +120,15 @@ class Marx2fits(ExternalBaseWrapper):
     program = 'marx2fits'
 
     def source(self):
-        '''Assemble string for marx2fits call'''
+        '''Assemble string for marx2fits call assuming PATH is set.'''
         options, marxdir, outfile = self.f(self.instance)
-        return ' '.join([os.path.join(external_settings['marxpath'], self.program),
-                         options, marxdir, outfile])
+        return ' '.join([self.program, options, marxdir, outfile]).replace(self.instance.basepath + '/', '')
 
     def __call__(self, obj):
-        run_external([self.source()], cwd=obj.basepath)
+        options, marxdir, outfile = self.f(self.instance)
+        marx2fitscall = ' '.join([os.path.join(external_settings['marxpath'], self.program),
+                                  options, marxdir, outfile])
+        run_external([marx2fitscall], cwd=obj.basepath)
 
 
 class MarxTest(object):
@@ -130,6 +147,7 @@ class MarxTest(object):
           webpages that summarize the test results.
         - outpath: path to a directory used for permanent output (final diagnostic
           figures, goodness-of-fit tables, html files etc.)
+        - plotformat: defaults to 'png' is not given.
     '''
 
     obsid = None
@@ -146,6 +164,7 @@ class MarxTest(object):
                                                      self.name))
         if hasattr(self, 'obsid') and self.download_all:
             download_chandra(self.obsid, self.datapath)
+        self.figures = OrderedDict()
 
     @property
     def name(self):
@@ -155,16 +174,44 @@ class MarxTest(object):
     def datapath(self):
         return os.path.join(self.basepath, 'download')
 
-    def run(self, label, marxversion, ciaoversion):
+    def figpath(self, name):
+        '''Return path and filename for a figure with name.
+
+        If the target directory does not exist, it will be created.
+
+        Parameters
+        ----------
+        name : string
+            name of figure (without extension)
+
+        Returns
+        -------
+        pathname : string
+            File and complete filename. The filename is composed of the name
+            of the test, the input ``name`` and the file format defined in
+            ``env['plotformat']``.
+        '''
+        if not os.path.exists(os.path.join(self.env['outpath'], 'figures')):
+            os.makedirs(os.path.join(self.env['outpath'], 'figures'))
+
+        return os.path.join(self.env['outpath'], 'figures',
+                            '{0}_{1}.{2}'.format(self.name, name,
+                                                  self.env.get('plotformat', 'png')))
+
+    @property
+    def steplist(self):
+        steplist = [method for method in dir(self) if (method[:5] == 'step_')]
+        steplist.sort(key=lambda s: int(s.split('_')[1]))
+        return [getattr(self, s) for s in steplist]
+
+    def run(self):
 
         if not os.path.exists(self.env['outpath']):
                 os.makedirs(self.env['outpath'])
 
         with ChangeDir(self.basepath):
-            steplist = [method for method in dir(self) if (method[:5] == 'step_')]
-            steplist.sort(key=lambda s: int(s.split('_')[1]))
-            for step in steplist:
-                getattr(self, step)()
+            for step in self.steplist:
+                step()
 
     def get_data_file(self, filetype):
         filename = glob(os.path.join(self.datapath,
