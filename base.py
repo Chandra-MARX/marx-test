@@ -157,6 +157,8 @@ class MarxTest(object):
     If ``False`` files will be downloaded one by one when they are needed.
     '''
 
+    figures = OrderedDict()
+
     def __init__(self, env):
         self.env = env
         self.env['outpath'] = os.path.abspath(env['outpath'])
@@ -164,7 +166,6 @@ class MarxTest(object):
                                                      self.name))
         if hasattr(self, 'obsid') and self.download_all:
             download_chandra(self.obsid, self.datapath)
-        self.figures = OrderedDict()
 
     @property
     def name(self):

@@ -5,8 +5,9 @@ In many cases, the charge cloud is large enough to produce detectable signal in 
 '''
 import os
 import numpy as np
+from collections import OrderedDict
 from matplotlib import pyplot as plt
-from astropy.table import Table\
+from astropy.table import Table
 
 from .. import base
 from ..utils import colname_case
@@ -42,13 +43,13 @@ def plot22(obs, sim, colname, energies=[[300, 1000], [1000, 2000]]):
     fig : `matplotlib.figure.Figure`
         Figure with plot
     '''
-    fig = plt.figure(figsize=(10, 10))
+    fig = plt.figure(figsize=(7, 7))
     for i, data in enumerate([obs, sim]):
         for j, en in enumerate(energies):
             ax = fig.add_subplot(2, 2, i * 2 + j + 1)
-            obssimlab = 'Observation' if i == 0 else 'MARX Simulation'
+            obssimlab = 'Obs' if i == 0 else 'MARX'
             energylab = '{0} - {1} eV'.format(en[0], en[1])
-            ax.set_title('{0}/n{1}'.format(obssimlab, energylab))
+            ax.set_title('{0}: {1}'.format(obssimlab, energylab))
             energy = colname_case(data, 'energy')
             plotpie(ax, data[(energy > en[0]) & (energy < en[1])], colname)
     return fig
@@ -65,6 +66,13 @@ In this particular case, there is very little source signal above 2 keV, so the 
     obsid = 15713
 
     download_all = False
+
+    figures = OrderedDict([('grades', {'alternative': 'Four pie charts that display the distribution of grades for observation and simulation for two different energy bands',
+                                      'caption': 'These pie charts show the distribution of grades in ASCA nomenclature (0-6). In a real observation the distribution of grades depends on the energy of the incoming photons.'}),
+                           ('fltgrades', {'alternative': 'Four pie charts that display the distribution of grades for observation and simulation for two different energy bands',
+                                          'caption': 'Same as the above, but using the more detailed Chandra flight grade numbers.'})
+                       ])
+
 
     summary = '''Both plots clearly show that MARX does not do a good job either at reproducing the distribution of grades in the first place in general, nor in reproducing the energy dependence. In the current implementation the MARX splits each pixel into a grid of 3*3 subpixels and the grade distribution for each of those sub-pixels is hardcoded.'''
 
@@ -93,17 +101,9 @@ In this particular case, there is very little source signal above 2 keV, so the 
 
         fig1 = plot22(obs, sim, 'grade')
         fig1.savefig(self.figpath('grades'))
-        self.figures['grades'] = {'title': 'ASCA grades',
-                                  'alternative': 'Four pie charts that display the distribution of grades for observation and simulation for two different energy bands',
-                                  'caption': 'These pie charts show the distribution of grades in ASCA nomenclature (0-6). In a real observation the distribution of grades depends on the energy of the incoming photons.'
-                                  }
 
         fig2 = plot22(obs, sim, 'fltgrade')
         fig2.savefig(self.figpath('fltgrades'))
-        self.figures['grades'] = {'title': 'Flight grades',
-                                  'alternative': 'Four pie charts that display the distribution of grades for observation and simulation for two different energy bands',
-                                  'caption': 'Same as the above, but using the more detailed Chandra flight grade numbers.'
-                                  }
 
 
 class ACIS_FI(ACIS_BI_low_energy):
@@ -111,3 +111,28 @@ class ACIS_FI(ACIS_BI_low_energy):
     '''
 
     obsid = 4496
+
+    @base.Ciao
+    def step_0(self):
+        evt2 = self.get_data_file('evt2')
+        return ["punlearn dmcopy",
+                'dmcopy "{0}[sky=circle(4072,4065,5)]" obs.fits clobber=yes'.format(evt2)]
+
+    @base.Marx
+    def step_1(self):
+        asol = self.get_data_file('asol')
+        pars = self.marxpars_from_asol(asol)
+        pars['MinEnergy'] = 2.
+        pars['MaxEnergy'] = 4.
+        return pars
+
+    @base.Python
+    def step_3(self):
+        obs = Table.read(os.path.join(self.basepath, 'obs.fits'), hdu=1)
+        sim = Table.read(os.path.join(self.basepath, 'marxsim.fits'), hdu=1)
+
+        fig1 = plot22(obs, sim, 'grade', [[2000., 3000.], [3000., 4000.]])
+        fig1.savefig(self.figpath('grades'))
+
+        fig2 = plot22(obs, sim, 'fltgrade', [[2000., 3000.], [3000., 4000.]])
+        fig2.savefig(self.figpath('fltgrades'))
