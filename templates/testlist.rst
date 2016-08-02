@@ -12,9 +12,9 @@
 ------------------------------------------------------------------------------
 
 {% if testinstance.obsid %}
-using data from: `ObsID {{ testinstance.obsid }} <http://cda.harvard.edu/chaser/startViewer.do?menuItem=details&obsid={{testinstance.obsid }}>`_
+:data: `ObsID {{ testinstance.obsid }} <http://cda.harvard.edu/chaser/startViewer.do?menuItem=details&obsid={{testinstance.obsid }}>`_
 {% endif %}
-link to code for this test: :ref:`test-code-{{testinstance.name}}`
+:code: :ref:`test-code-{{testinstance.name}}`
 
 {{ testinstance.__doc__ }}
 
