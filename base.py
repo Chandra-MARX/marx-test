@@ -29,7 +29,15 @@ def run_external(cmdlist, setup=None, **kwargs):
 
 
 class ExternalBaseWrapper(object):
+    '''Wrap a function that is run as part of a test.
 
+    The wrapped function will have two important methods: ``__call__``
+    and ``source``, which returns the source as run in a test.
+    In the simplest case, the function might dynamically insert a filename
+    and path into a string template. For display purposes, we do not want
+    to see that template, but the complete commands run as part of a test,
+    e.g. the CIAO commands to extract a spectrum.
+    '''
     interpreter = 'undefined'
     program = 'unknown'
 
@@ -39,9 +47,6 @@ class ExternalBaseWrapper(object):
 
     def source(self):
         raise NotImplementedError
-
-    def html(self):
-        print 'test text' + self.source() + 'test text 2'
 
     def __call__(self, obj):
         self.f(obj)
@@ -56,7 +61,16 @@ class ExternalBaseWrapper(object):
 
 
 class Python(ExternalBaseWrapper):
+    '''Wrap a python test function.
 
+    Wrap a function written in python. ``source`` attempts to parse the python
+    code and identify other python functions that are called by the wrapped
+    function. These are included in the output so that the reader can see all
+    important steps of the test.
+
+    The wrapped function is just called normally. It should be defined like any
+    other python function.
+    '''
     interpreter = "python"
     program = 'Python'
 
@@ -72,11 +86,17 @@ class Python(ExternalBaseWrapper):
         return fsource
 
     def __call__(self, obj):
-        self.f(obj)
+        return self.f(obj)
 
 
 class Ciao(ExternalBaseWrapper):
+    '''Wrap functions that generate CIAO shell commands.
 
+    The output format of the wrapped function is a list of strings.
+
+    On display with ``source`` absolute path in the CIAO commands will be
+    replaced with relative path, which are typically shorter in print.
+    '''
     interpreter = "shell"
     program = 'CIAO'
 
@@ -88,7 +108,12 @@ class Ciao(ExternalBaseWrapper):
 
 
 class Marx(ExternalBaseWrapper):
+    '''Wrap a function that generates MARX input parameters.
 
+    The output format of the wrapped function is a dictionary of MARX
+    parameters. All parameters that are not set in this dictionary stay
+    at the default set in marx.par in the marx installation.
+    '''
     interpreter = "shell"
     program = 'marx'
 
@@ -229,7 +254,19 @@ class MarxTest(object):
             raise ValueError('Specification not unique. Found {0}'.format(filename))
 
     def marxpars_from_asol(self, asolfile):
+        '''Set MARX parameters from asol file.
 
+        Parameters
+        ----------
+        asolfile : string
+            Path and name of an asol file
+
+        Returns
+        -------
+        marx_pars : dict
+            Dictionary with marx parameters as far as they can be extracted from
+            the data in the asol file.
+        '''
         asol = fits.getheader(asolfile, 1)
 
         skyco = SkyCoord.from_name(asol['OBJECT'].split('/')[0])
