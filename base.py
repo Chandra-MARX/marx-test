@@ -10,9 +10,6 @@ import textwrap
 from .utils import download_chandra, ChangeDir
 from .run_external import external_settings
 
-from astropy.io import fits
-from astropy.coordinates import SkyCoord
-
 
 def run_external(cmdlist, setup=None, **kwargs):
     '''
@@ -252,36 +249,3 @@ class MarxTest(object):
 
         else:
             raise ValueError('Specification not unique. Found {0}'.format(filename))
-
-    def marxpars_from_asol(self, asolfile):
-        '''Set MARX parameters from asol file.
-
-        Parameters
-        ----------
-        asolfile : string
-            Path and name of an asol file
-
-        Returns
-        -------
-        marx_pars : dict
-            Dictionary with marx parameters as far as they can be extracted from
-            the data in the asol file.
-        '''
-        asol = fits.getheader(asolfile, 1)
-
-        skyco = SkyCoord.from_name(asol['OBJECT'].split('/')[0])
-        # Set sensible default parameters
-        marx_pars = {
-                     # keep things simple so that sky and det coos are aligned
-                     'SourceRA': skyco.ra.value,
-                     'SourceDEC': skyco.dec.value,
-                     'RA_Nom': asol['RA_NOM'],
-                     'Dec_Nom': asol['DEC_NOM'],
-                     'Roll_Nom': asol['ROLL_NOM'],
-                     'GratingType': asol['GRATING'],
-                     'ExposureTime': asol['TSTOP'] - asol['TSTART'],
-                     'DitherModel': 'FILE',
-                     'DitherFile': asolfile,
-                     'TStart': asol['TSTART'],
-                    }
-        return marx_pars

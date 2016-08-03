@@ -11,6 +11,7 @@ from astropy.table import Table
 
 from .. import base
 from ..utils import colname_case
+from ..process_utils import marxpars_from_asol
 
 tests = ['ACIS_BI_low_energy', 'ACIS_FI']
 
@@ -85,7 +86,7 @@ In this particular case, there is very little source signal above 2 keV, so the 
     @base.Marx
     def step_1(self):
         asol = self.get_data_file('asol')
-        pars = self.marxpars_from_asol(asol)
+        pars = marxpars_from_asol(asol)
         pars['MinEnergy'] = 0.3
         pars['MaxEnergy'] = 2.0
         return pars
@@ -121,7 +122,7 @@ class ACIS_FI(ACIS_BI_low_energy):
     @base.Marx
     def step_1(self):
         asol = self.get_data_file('asol')
-        pars = self.marxpars_from_asol(asol)
+        pars = marxpars_from_asol(asol)
         pars['MinEnergy'] = 2.
         pars['MaxEnergy'] = 4.
         return pars
