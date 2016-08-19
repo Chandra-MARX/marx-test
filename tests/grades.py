@@ -86,7 +86,8 @@ In this particular case, there is very little source signal above 2 keV, so the 
     @base.Marx
     def step_1(self):
         asol = self.get_data_file('asol')
-        pars = marxpars_from_asol(asol)
+        evt2 = self.get_data_file('evt2')
+        pars = marxpars_from_asol(asol, evt2)
         pars['MinEnergy'] = 0.3
         pars['MaxEnergy'] = 2.0
         return pars
@@ -122,7 +123,8 @@ class ACIS_FI(ACIS_BI_low_energy):
     @base.Marx
     def step_1(self):
         asol = self.get_data_file('asol')
-        pars = marxpars_from_asol(asol)
+        evt2 = self.get_data_file('evt2')
+        pars = marxpars_from_asol(asol, evt2)
         pars['MinEnergy'] = 2.
         pars['MaxEnergy'] = 4.
         return pars

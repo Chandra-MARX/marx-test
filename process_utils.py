@@ -1,8 +1,11 @@
 from warnings import warn
+import subprocess
 
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy.coordinates.name_resolve import NameResolveError
+
+from .run_external import external_settings
 
 
 def detectorfromkeyword(keyword):
@@ -34,8 +37,8 @@ def detectorfromkeyword(keyword):
         return ''
 
 
-def marxpars_from_asol(asolfile):
-    '''Set MARX parameters from asol or evt file.
+def marxpars_from_asol(asolfile, evt2file):
+    '''Set MARX parameters from asol and evt file.
 
     This function parses the header of a fits file and uses the
     information in the header to set as many marx parameters as possible.
@@ -43,7 +46,10 @@ def marxpars_from_asol(asolfile):
     Parameters
     ----------
     asolfile : string
-        Path and name of an asol or evt file
+        Path and name of an asol file
+
+    evt2file : string
+        Path and name of an evt2 file
 
     Returns
     -------
@@ -52,6 +58,7 @@ def marxpars_from_asol(asolfile):
         the data in the asol file.
     '''
     asol = fits.getheader(asolfile, 1)
+    evt = fits.getheader(evt2file, 1)
 
     marx_pars = {'RA_Nom': asol['RA_NOM'],
                  'Dec_Nom': asol['DEC_NOM'],
@@ -74,7 +81,7 @@ def marxpars_from_asol(asolfile):
         marx_pars['SourceDEC'] = asol['DEC_NOM']
 
     # DetectorType
-    det = detectorfromkeyword(asol['DETNAM'])
+    det = detectorfromkeyword(evt['DETNAM'])
     if det != '':
         marx_pars['DetectorType'] = det
     else:
@@ -83,7 +90,7 @@ def marxpars_from_asol(asolfile):
     return marx_pars
 
 
-def spectrum_from_flux_correction(asolfile, evtfile, x, y, region, psffrac=1):
+def spectrum_from_fluxcorrection(asolfile, evtfile, x, y, region, psffrac=1):
     '''Estimate a source spectrum through flux correction.
 
     We will simply extract the counts in a region containing the observed PSF
@@ -120,6 +127,14 @@ def spectrum_from_flux_correction(asolfile, evtfile, x, y, region, psffrac=1):
     if det[:4] != 'ACIS':
         raise ValueError('This works only for ACIS. Detector found: {0}'.format(det))
 
+    cmdlist = ['dmcoords {evt} asol={asol} option=sky x={x} y={y}'.format(evt=evtfile,
+                                                            asol=asolfile, x=x, y=y),
+               'pget dmcoords chip_id'
+              ]
+    ccd_id = subprocess.check_output([external_settings['CIAO'] + '\n' + '\n'.join(cmdlist)],
+                    shell=True)
+    ccd_id = ccd_id.split('\n')[-2]
+
     return '''
 asphist infile={asolfile} outfile=obs.asp evtfile={evtfile} clobber=yes
 # It would be more accuarte to use mkwarf.
@@ -148,4 +163,4 @@ awk '{{ sub(/\\# ENERG_LO/,"ENERG_LO"); print }}' < input_spec_saotrace.tbl > in
 # Then, replace spaces with tabs
 tr ' ' \\\\t < input_spec_saotrace.temp > input_spec_saotrace.rdb
 
-'''.format(det=det, grating=evt['GRATING'], evtfile=evtfile, x=x, y=y, asolfile=asolfile, region=region, psffrac=psffrac, exptime=evt['TSTOP'] - evt['TSTART']).split('\n')
+'''.format(det='ACIS-{0}'.format(ccd_id), grating=evt['GRATING'], evtfile=evtfile, x=x, y=y, asolfile=asolfile, region=region, psffrac=psffrac, exptime=evt['TSTOP'] - evt['TSTART']).split('\n')
