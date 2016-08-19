@@ -86,6 +86,26 @@ class Python(ExternalBaseWrapper):
         return self.f(obj)
 
 
+class Sherpa(ExternalBaseWrapper):
+    '''Wrap a Sherpa script.
+
+    The wrapped function should return a single string
+    (possibly with \n in there). In order to execute that, it is written
+    to a temporary file and executed in a subshell after proper CIAO
+    initialization.
+    '''
+    interpreter = "python"
+    program = 'Sherpa'
+
+    def source(self):
+        return self.f(self.instance).replace(self.instance.basepath + '/', '')
+
+    def __call__(self, obj):
+        with open('sherpa_script.py', 'w') as f:
+            f.write(self.f(obj))
+        run_external(['sherpa sherpa_script.py'], setup='CIAO', cwd=obj.basepath)
+
+
 class Ciao(ExternalBaseWrapper):
     '''Wrap functions that generate CIAO shell commands.
 
@@ -151,6 +171,24 @@ class Marx2fits(ExternalBaseWrapper):
         marx2fitscall = ' '.join([os.path.join(external_settings['marxpath'], self.program),
                                   options, marxdir, outfile])
         run_external([marx2fitscall], cwd=obj.basepath)
+
+
+class SAOTraceLua(ExternalBaseWrapper):
+    interpreter = "lua"
+    program = "Lua input for SAOTrace"
+
+    def source(self):
+        return '\n'.join(self.f(self.instance))
+
+    def __call__(self, obj):
+        with open('saotrace_source.lua', 'w') as f:
+            for line in self.f(obj):
+                f.write(line)
+
+
+class SAOTrace(Ciao):
+    interpreter = "shell"
+    program = "SAOTrace"
 
 
 class MarxTest(object):
