@@ -1,3 +1,1 @@
-import grades
-
-modulelist = ['grades']
+modulelist = ['PSF', 'grades']

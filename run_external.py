@@ -19,4 +19,11 @@ external_settings = {None : '',
     'marxparfile' : '/nfs/melkor/d1/guenther/marx/installed/dev/share/marx/pfiles/marx.par',
                      'marxpath': '/nfs/melkor/d1/guenther/marx/installed/dev/bin/',
 
+    'SAOTrace': '''
+#!/bin/sh
+# unset DISPLAY
+. /nfs/mkx/a1/setup/saotrace-setup.sh > /dev/null
+"$@"
+''',
+
 }

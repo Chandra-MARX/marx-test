@@ -37,6 +37,32 @@ def detectorfromkeyword(keyword):
         return ''
 
 
+def target_coos_from_asol(asolfile):
+    '''Get coordinates for the target named in asol file.
+
+    If the target name cannot be resolved, return the nominal aimpoint,
+    assuming a on-axis pointing.
+
+    Parameters
+    ----------
+    asolfile : string
+        Path and name of an asol file
+
+    Returns
+    -------
+    ra, dec : float
+        RA and Dec in degrees
+    '''
+    asol = fits.getheader(asolfile, 1)
+    try:
+        objname = asol['OBJECT'].split('/')[0]
+        skyco = SkyCoord.from_name(objname)
+        return skyco.ra.value, skyco.dec.value
+    except NameResolveError:
+        warn('Target name {0} not resolved. Assuming on-axis target.'.format(objname))
+        return asol['RA_NOM'], asol['DEC_NOM']
+
+
 def marxpars_from_asol(asolfile, evt2file):
     '''Set MARX parameters from asol and evt file.
 
@@ -69,16 +95,13 @@ def marxpars_from_asol(asolfile, evt2file):
                  'DitherFile': asolfile,
                  'TStart': asol['TSTART'],
     }
+    # ACIS Exposure time (might vary for sub-array read-out)
+    if evt['INSTRUME'][0:4] == 'ACIS':
+        marx_pars['ACIS_Exposure_Time'] = evt['EXPTIME']
     # Target coordiantes
-    try:
-        objname = asol['OBJECT'].split('/')[0]
-        skyco = SkyCoord.from_name(objname)
-        marx_pars['SourceRA'] = skyco.ra.value
-        marx_pars['SourceDEC'] = skyco.dec.value
-    except NameResolveError:
-        warn('Target name {0} not resolved. Assuming on-axis target.'.format(objname))
-        marx_pars['SourceRA'] = asol['RA_NOM']
-        marx_pars['SourceDEC'] = asol['DEC_NOM']
+    ra, dec = target_coos_from_asol(asolfile)
+    marx_pars['SourceRA'] = ra
+    marx_pars['SourceDEC'] = dec
 
     # DetectorType
     det = detectorfromkeyword(evt['DETNAM'])
