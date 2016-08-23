@@ -45,5 +45,19 @@ the code.
    {% for module in modulelist %}{{ module }}
    {% endfor %}
 
+The code to run all these tests is available and linked below. However, please
+note that it will not execute as-is on your computer because it depends on the
+local ``$PATH`` and other environment variables. For example, we use `Python
+<www.python.org>`_ scripts to set up a directory structure, download Chandra
+data, initialize `CIAO`_ etc. See `https://github.com/Chandra-MARX/marx-test`
+for the full code to run all tests.
+
+Advanced users may wish to inspect the code of the tests for some more ideas on
+how to use |marx|. See :ref:`examples` for a list of well-commented and
+explained |marx| examples.
+
+.. toctree::
+   :maxdepth: 2
+
    listofcode
 
