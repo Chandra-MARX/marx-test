@@ -96,6 +96,7 @@ class ACISSPSF(base.MarxTest):
     the simulation of a point source on a BI ACIS-S chip to an observation.
     '''
 
+    title = 'On-axis PSF on an ACIS-BI chip'
     obsid = 15713
     download_all = True
 
@@ -181,7 +182,11 @@ point{{ position = {{ ra = {ra},
         asol = self.get_data_file('asol')
         asolh = fits.getheader(asol, 1)
 
-        return ['trace-nest tag=saotrace srcpars=saotrace_source.lua tstart={tstart}  limit={limit} limit_type=sec'.format(tstart=asolh['TSTART'], limit=asolh['TSTOP'] - asolh['TSTART'])]
+        limit = asolh['TSTOP'] - asolh['TSTART']
+        # CXO time numbers are large and round-off error can appear
+        # which make SAOTrace fail.
+        limit = limit - 0.01
+        return ['trace-nest tag=saotrace srcpars=saotrace_source.lua tstart={tstart}  limit={limit} limit_type=sec'.format(tstart=asolh['TSTART'], limit=limit)]
 
     @base.Marx
     def step_5(self):
@@ -200,8 +205,22 @@ point{{ position = {{ ra = {ra},
     def step_6(self):
         return ('--pixadj=EDSER', 'marx_saotrace', 'marx_saotrace.fits')
 
+    @base.Marx2fits
+    def step_10(self):
+        return ('--pixadj=RANDOMIZE', 'marx_only', 'marx_only_rand.fits')
+
+    @base.Marx2fits
+    def step_11(self):
+        return ('--pixadj=RANDOMIZE', 'marx_saotrace', 'marx_saotrace_rand.fits')
+
+    @base.Ciao
+    def step_12(self):
+        evt2 = self.get_data_file('evt2')
+        asol = self.get_data_file('asol')
+        return ['acis_process_events infile={evt} outfile=obs_rand.fits acaofffile={asol} doevtgrade=no calculate_pi=no pix_adj=RANDOMIZE clobber=yes'.format(evt=evt2, asol=asol)]
+
     @base.Python
-    def step_7(self):
+    def step_20(self):
 
         filterargs = {'energy': [300, 3000],
                       'circle': (self.source['x'], self.source['y'],
@@ -209,25 +228,38 @@ point{{ position = {{ ra = {ra},
                       }
 
         evt2file = self.get_data_file('evt2')
-        obs = Table.read(evt2file)
-        # In this energy range we have the most counts and we limited
-        # the simulations to the same range.
-        obs = filter_events(obs, **filterargs)
-        r = radial_distribution(obs['x'], obs['y'])
-        val, edges = np.histogram(r, range=[0, 5], bins=25)
-        plt.plot(0.1 + edges[:-1], 1.0 * val.cumsum() / val.sum(), 'k', lw=3, label='Obs')
 
-        simmarx = filter_events(Table.read('marx_only.fits'), **filterargs)
-        r = radial_distribution(simmarx['X'], simmarx['Y'])
-        val, edges = np.histogram(r, range=[0, 5], bins=25)
-        plt.plot(0.1 + edges[:-1], 1.0 * val.cumsum() / val.sum(), 'r', lw=3, label='MARX')
+        fig = plt.figure(figsize=(10,5))
+        ax1 = fig.add_subplot(121)
+        ax2 = fig.add_subplot(122)
 
-        simmarx = filter_events(Table.read('marx_saotrace.fits'), **filterargs)
-        r = radial_distribution(simmarx['X'], simmarx['Y'])
-        val, edges = np.histogram(r, range=[0, 5], bins=25)
-        plt.plot(0.1 + edges[:-1], 1.0 * val.cumsum() / val.sum(), 'r', lw=3, label='MARX + SAOTrace')
+        for ax, files, title in zip([ax1, ax2],
+                                    [[evt2file, 'marx_only.fits', 'marx_saotrace.fits'],
+                                     ['obs_rand.fits', 'marx_only_rand.fits', 'marx_saotrace_rand.fits']],
+                                    ['EDSER', 'RANDOMIZE']):
 
-        plt.title('EDSER')
-        plt.xlabel('radius [pixel]')
-        plt.ylabel('enclosed count fraction')
-        plt.savefig(self.figpath('ECF'))
+            # In this energy range we have the most counts and we limited
+            # the simulations to the same range.
+            obs = filter_events(Table.read(files[0]), **filterargs)
+            r = radial_distribution(obs['x'], obs['y'])
+            val, edges = np.histogram(r, range=[0, 5], bins=25)
+            ax.semilogx(0.1 + edges[:-1], 1.0 * val.cumsum() / val.sum(), 'k', lw=3, label='Observation')
+
+            simmarx = filter_events(Table.read(files[1]), **filterargs)
+            r = radial_distribution(simmarx['X'], simmarx['Y'])
+            val, edges = np.histogram(r, range=[0, 5], bins=25)
+            ax.semilogx(0.1 + edges[:-1], 1.0 * val.cumsum() / val.sum(), 'r', lw=3, label='MARX')
+
+            simmarx = filter_events(Table.read(files[2]), **filterargs)
+            r = radial_distribution(simmarx['X'], simmarx['Y'])
+            val, edges = np.histogram(r, range=[0, 5], bins=25)
+            ax.semilogx(0.1 + edges[:-1], 1.0 * val.cumsum() / val.sum(), 'b', lw=3, label='SAOTrace + MARX')
+
+            ax.set_title(title)
+            ax.set_xlabel('radius [pixel]')
+            ax.set_ylabel('enclosed count fraction')
+            ax.legend(loc='lower right')
+            ax.set_xlim([0.1, 5])
+            ax.grid()
+
+        fig.savefig(self.figpath(self.figures.keys()[0]))

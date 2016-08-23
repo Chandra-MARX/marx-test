@@ -3,7 +3,7 @@ from os.path import join as pjoin
 import os
 import jinja2
 
-from . import tests
+from .tests import modulelist
 
 
 def write_summary_rst(env):
@@ -38,7 +38,7 @@ def write_summary_rst(env):
 
     # write module and code pages
     codelist = []
-    for module in tests.modulelist:
+    for module in modulelist:
         imp_module = importlib.import_module('marxtest.tests.' + module)
         for t in imp_module.tests:
             testclass = getattr(imp_module, t)
@@ -47,7 +47,7 @@ def write_summary_rst(env):
 
     # write intro
     with open(pjoin(env['outpath'], 'index.rst'), 'w') as f:
-        f.write(testindex.render(modulelist=tests.modulelist))
+        f.write(testindex.render(modulelist=modulelist))
 
     # write codelist because every page must be in some TOC tree
     with open(pjoin(env['outpath'], 'listofcode.rst'), 'w') as f:
@@ -81,7 +81,7 @@ def run_and_output(env, run=True, modules=None, tests=None):
 
     # write module and code pages
     if modules is None:
-        modules = tests.modulelist
+        modules = modulelist
     for module in modules:
         imp_module = importlib.import_module('marxtest.tests.' + module)
         t_list = []

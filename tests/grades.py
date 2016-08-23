@@ -68,6 +68,8 @@ In this particular case, there is very little source signal above 2 keV, so the 
 
     download_all = False
 
+    title = 'Grades on an ACIS-BI chip'
+
     figures = OrderedDict([('grades', {'alternative': 'Four pie charts that display the distribution of grades for observation and simulation for two different energy bands',
                                       'caption': 'These pie charts show the distribution of grades in ASCA nomenclature (0-6). In a real observation the distribution of grades depends on the energy of the incoming photons.'}),
                            ('fltgrades', {'alternative': 'Four pie charts that display the distribution of grades for observation and simulation for two different energy bands',
@@ -113,6 +115,8 @@ class ACIS_FI(ACIS_BI_low_energy):
     '''
 
     obsid = 4496
+
+    title = 'Grades on an ACIS-FI chip'
 
     @base.Ciao
     def step_0(self):
