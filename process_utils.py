@@ -99,9 +99,9 @@ def marxpars_from_asol(asolfile, evt2file):
     if evt['INSTRUME'][0:4] == 'ACIS':
         marx_pars['ACIS_Exposure_Time'] = evt['EXPTIME']
     # Target coordiantes
-    ra, dec = target_coos_from_asol(asolfile)
-    marx_pars['SourceRA'] = ra
-    marx_pars['SourceDEC'] = dec
+    # ra, dec = target_coos_from_asol(asolfile)
+    marx_pars['SourceRA'] = evt['RA_TARG']
+    marx_pars['SourceDEC'] = evt['DEC_TARG']
 
     # DetectorType
     det = detectorfromkeyword(evt['DETNAM'])

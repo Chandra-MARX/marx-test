@@ -183,4 +183,4 @@ def colname_case(table, name):
         if name.lower() == n.lower():
             return table[n]
     else:
-        raise KeyError('{0} not found in {1}'.format(name, table.col_names))
+        raise KeyError('{0} not found in {1}'.format(name, table.colnames))

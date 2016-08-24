@@ -103,7 +103,7 @@ class Sherpa(ExternalBaseWrapper):
     def __call__(self, obj):
         with open('sherpa_script.py', 'w') as f:
             f.write(self.f(obj))
-        run_external(['sherpa sherpa_script.py'], setup='CIAO', cwd=obj.basepath)
+        run_external(['sherpa -b sherpa_script.py'], setup='CIAO', cwd=obj.basepath)
 
 
 class Ciao(ExternalBaseWrapper):
@@ -153,8 +153,8 @@ class Marx(ExternalBaseWrapper):
         run_external([' '.join(marxcall)], cwd=obj.basepath)
 
 
-class Marx2asp(Marx):
-    program = 'marx2asp'
+class Marxasp(Marx):
+    program = 'marxasp'
 
 
 class Marx2fits(ExternalBaseWrapper):
@@ -178,7 +178,7 @@ class SAOTraceLua(ExternalBaseWrapper):
     program = "Lua input for SAOTrace"
 
     def source(self):
-        return '\n'.join(self.f(self.instance))
+        return self.f(self.instance)
 
     def __call__(self, obj):
         with open('saotrace_source.lua', 'w') as f:
@@ -266,7 +266,8 @@ class MarxTest(object):
         return [getattr(self, s) for s in steplist]
 
     def run(self):
-
+        self.pkg_data = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                                     'tests', 'data'))
         if not os.path.exists(self.env['outpath']):
                 os.makedirs(self.env['outpath'])
 

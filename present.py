@@ -60,7 +60,7 @@ def run_and_output(env, run=True, modules=None, tests=None):
     Parameters
     ----------
     env : dict
-        Dictionary with a ket ``outpath``.
+        Dictionary with a key ``outpath``.
     run : boolean
         If ``True`` tests will be executed, otherwise test results
         already on disk from a previous run will be parsed to generate

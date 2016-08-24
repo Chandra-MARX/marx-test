@@ -3,7 +3,7 @@ Eventually, these string definitions should be moved to a configuration file,
 but for now I just define them here.
 '''
 external_settings = {None : '',
-    'CIAO': '''
+                     'CIAO': '''
 #!/bin/sh
 # unset DISPLAY
 # export CIAO_MAJOR_VER=-4.7
@@ -16,10 +16,11 @@ external_settings = {None : '',
 . /nfs/cxc/a1/setup/ciao-setup.sh -o > /dev/null
 "$@"
 ''',
-    'marxparfile' : '/nfs/melkor/d1/guenther/marx/installed/dev/share/marx/pfiles/marx.par',
+                     'marxparfile': '/nfs/melkor/d1/guenther/marx/installed/dev/share/marx/pfiles/marx.par',
+                     'marxaspparfile': '/nfs/melkor/d1/guenther/marx/installed/dev/share/marx/pfiles/marxasp.par',
                      'marxpath': '/nfs/melkor/d1/guenther/marx/installed/dev/bin/',
 
-    'SAOTrace': '''
+                     'SAOTrace': '''
 #!/bin/sh
 # unset DISPLAY
 . /nfs/mkx/a1/setup/saotrace-setup.sh > /dev/null

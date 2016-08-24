@@ -1,5 +1,5 @@
-List of code use to run tests
-=============================
+List of code used to run tests
+==============================
 You can inspect the code for all tests listed in the following to see exactly
 what is tested. However, a direct copy and paste will not work because 
 it depends on the local ``$PATH`` settings and other environment variables.
