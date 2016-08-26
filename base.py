@@ -11,6 +11,53 @@ from .utils import download_chandra, ChangeDir
 from .run_external import external_settings
 
 
+class OutputNumber(object):
+    '''
+    '''
+    max_title_length = 20
+
+    def __init__(self, testname, value, title, unit='',
+                 error=None, expected=None, description=None):
+        self.testname = testname
+        self.value = value
+        self._title = title
+        self.error = error
+        self.expected = expected
+        self.unit = unit
+        self._description = description
+
+    @property
+    def title(self):
+        return self._title
+
+    @title.setter
+    def title(self, title):
+        if len(title) > self.max_title_length:
+            raise ValueError('Title can only be {0} characters long'.format(self.max_title_length))
+        else:
+            self._title = title
+
+    @property
+    def description(self):
+        if self._description is not None:
+            return self._description
+        else:
+            return self.title
+
+    @description.setter
+    def description(self, description):
+        self._description = description
+
+    def to_dict(self):
+        return {'testname': self.testname,
+                'value': self.value,
+                'title': self.title,
+                'error': self.error,
+                'expected': self.expected,
+                'description': self.description,
+                'unit': self.unit
+                }
+
 def run_external(cmdlist, setup=None, **kwargs):
     '''
     Parameters
