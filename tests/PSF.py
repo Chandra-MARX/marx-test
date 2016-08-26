@@ -397,7 +397,7 @@ simplification that the |marx| mirror model makes.'''
 
     source = {'x': 5246,
               'y': 6890,
-              'r': 40}
+              'r': 200}
 
     @base.Ciao
     def step_0(self):
