@@ -92,6 +92,35 @@ class ExternalBaseWrapper(object):
     def source(self):
         raise NotImplementedError
 
+    @property
+    def title(self):
+        '''First line of function doctring
+
+        If the function has no docstring, return the function name instead.
+        '''
+        if self.f.__doc__ is None:
+            return self.f.__name__
+        else:
+            return self.f.__doc__.split('\n')[0]
+
+    @property
+    def description(self):
+        '''Function docstring except for the first line
+
+        The first line of the docstring is considered the title and is removed,
+        the remaining lines are dedented.
+        If the docstring does not have any lines beyond the first, return
+        an empty string.
+        '''
+        if self.f.__doc__ is None:
+            return ''
+        else:
+            lines = self.f.__doc__.split('\n')
+            if len(lines) > 1:
+                return textwrap.dedent('\n'.join(lines[1:]))
+            else:
+                return ''
+
     def __call__(self, obj):
         self.f(obj)
 

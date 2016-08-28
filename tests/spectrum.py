@@ -126,6 +126,7 @@ class SpectrumAbsPowACISS(base.MarxTest):
 
     @base.Sherpa
     def step_1(self):
+        '''Generate input spectrum'''
         sherpa = '''
         # set source properties
         set_source(xsphabs.a * xspowerlaw.p)
@@ -148,12 +149,13 @@ class SpectrumAbsPowACISS(base.MarxTest):
 
     @base.Marx
     def step_2(self):
+        '''Point source'''
         pars = {'SourceFlux': -1,
                 'SpectrumType': "FILE",
                 'SpectrumFile': "marx_input.tbl",
                 'ExposureTime': 30000,
                 'TStart': 2015.5,
-                'OutputDir': 'plaw',
+                'OutputDir': 'marx',
                 'GratingType': "NONE",
                 'DetectorType': self.source['detector_type'],
                 'DitherModel': "INTERNAL",
@@ -166,30 +168,33 @@ class SpectrumAbsPowACISS(base.MarxTest):
 
     @base.Marx2fits
     def step_3(self):
-        return ('--pixadj=NONE', 'plaw', 'plaw_evt2.fits')
+        '''turn into fits file'''
+        return ('--pixadj=NONE', 'marx', 'marx_evt2.fits')
 
     @base.Marxasp
     def step_4(self):
-        pars = {'MarxDir': "plaw",
-                'OutputFile': "plaw_asol1.fits"
+        '''Make asol file for CIAO'''
+        pars = {'MarxDir': "marx",
+                'OutputFile': "marx_asol1.fits"
                 }
         return pars
 
     @base.Ciao
     def step_5(self):
-        '''
+        '''Extract spectra
+
         Use special settings to account for steps that |marx| does not include:
         ACIS QE maps and current (non FEF) rmfs.
         '''
         commands = '''
         phagrid="pi=1:1024:1"
 
-        evtfile="plaw_evt2.fits"
-        asolfile="plaw_asol1.fits"
-        phafile="plaw_pha.fits"
-        rmffile="plaw_rmf.fits"
-        arffile="plaw_arf.fits"
-        asphistfile="plaw_asp.fits"
+        evtfile="marx_evt2.fits"
+        asolfile="marx_asol1.fits"
+        phafile="marx_pha.fits"
+        rmffile="marx_rmf.fits"
+        arffile="marx_arf.fits"
+        asphistfile="marx_asp.fits"
 
         asphist infile="$asolfile" outfile="$asphistfile" evtfile="$evtfile" clobber=yes
 
@@ -223,15 +228,16 @@ class SpectrumAbsPowACISS(base.MarxTest):
     @base.Ciao
     def step_6(self):
         '''Use default CIAO tools to extract a spectrum'''
-        command = 'specextract "plaw_evt2.fits[sky={src}]" spec asp=plaw_asp.fits weight=no clobber=yes mskfile=NONE badpixfile=NONE'.format(src=self.src_reg)
+        command = 'specextract "marx_evt2.fits[sky={src}]" spec asp=marx_asp.fits weight=no clobber=yes mskfile=NONE badpixfile=NONE'.format(src=self.src_reg)
         return [command]
 
     @base.Sherpa
     def step_7(self):
+        '''Compare spectra to input model'''
         sherpa = '''
-        load_pha(1, 'plaw_pha.fits')
-        load_rmf(1, 'plaw_rmf.fits')
-        load_arf(1, 'plaw_arf.fits')
+        load_pha(1, 'marx_pha.fits')
+        load_rmf(1, 'marx_rmf.fits')
+        load_arf(1, 'marx_arf.fits')
         load_data(2, 'spec_grp.pi')
         group_counts(1, 25)
         group_counts(2, 25)

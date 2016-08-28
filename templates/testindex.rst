@@ -1,6 +1,6 @@
-----------------
-Tests for |marx|
-----------------
+---------------------------
+|marx| accuracy and testing
+---------------------------
 
 No simulation is ever perfect. In this section, we shows tests for the internal
 consistency of |marx| and compare simulations to real observations.

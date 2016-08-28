@@ -120,7 +120,18 @@ class HRCIPSF(base.MarxTest):
 
     @base.Python
     def step_0(self):
+        '''Copy input spectra
 
+        Since the HRC has no intrisinc energy resolution, the source spectrum
+        can not be taken from the observed data. Instead, we fitted a model
+        to a grating spectrum of the same source and saved that model
+        spectrum to a file. AR Lac is knows to be time variable and show
+        stellar flares, so this spectrum is only an approximation, but it
+        is the best we can do here.
+
+        Spectrum files are part of the marx-test distribution.
+        Copy them from the source code into the right directory.
+        '''
         shutil.copy(os.path.join(self.pkg_data, 'ARLac_input_spec_marx.tbl'),
                     os.path.join(self.basepath, 'input_spec_marx.tbl'))
         shutil.copy(os.path.join(self.pkg_data, 'ARLac_input_spec_saotrace.rdb'),
@@ -128,6 +139,7 @@ class HRCIPSF(base.MarxTest):
 
     @base.Marx
     def step_1(self):
+        '''Set marx parameters appropriate for observation'''
         asol = self.get_data_file('asol')
         evt = self.get_data_file('evt2')
         pars = marxpars_from_asol(asol, evt)
@@ -139,10 +151,12 @@ class HRCIPSF(base.MarxTest):
 
     @base.Marx2fits
     def step_2(self):
+        '''No EDSER is available for GRC data'''
         return ('--pixadj=NONE', 'marx_only', 'marx_only.fits')
 
     @base.SAOTraceLua
     def step_3(self):
+        '''`SAOTrace`_ input matching observation'''
         asol = self.get_data_file('asol')
         asolh = fits.getheader(asol, 1)
         evt = fits.getheader(self.get_data_file('evt2'), 1)
@@ -173,17 +187,21 @@ point{{ position = {{ ra = {ra},
 
     @base.SAOTrace
     def step_4(self):
+        '''
+        CXO time numbers are large and round-off error can appear
+        which make `SAOTrace`_ fail.
+        Therefore, shorten all times by about 0.01 sec to make sure.
+        '''
         asol = self.get_data_file('asol')
         asolh = fits.getheader(asol, 1)
 
         limit = asolh['TSTOP'] - asolh['TSTART']
-        # CXO time numbers are large and round-off error can appear
-        # which make SAOTrace fail.
         limit = limit - 0.02
         return ['trace-nest tag=saotrace srcpars=saotrace_source.lua tstart={tstart}  limit={limit} limit_type=sec'.format(tstart=asolh['TSTART'] + 0.01, limit=limit)]
 
     @base.Marx
     def step_5(self):
+        '''Run |marx| with `SAOTrace`_ ray file as input'''
         asol = self.get_data_file('asol')
         evt = self.get_data_file('evt2')
         pars = marxpars_from_asol(asol, evt)
@@ -197,11 +215,12 @@ point{{ position = {{ ra = {ra},
 
     @base.Marx2fits
     def step_6(self):
+        '''Same settings as the marx2fits ron above'''
         return ('--pixadj=NONE', 'marx_saotrace', 'marx_saotrace.fits')
 
     @base.Python
     def step_20(self):
-
+        '''Extract radial count distribution'''
         filterargs = {'circle': (self.source['x'], self.source['y'],
                                  5 * self.source['r'])
                       }
@@ -273,6 +292,7 @@ class ACISSPSF(HRCIPSF):
     '''
     @base.Ciao
     def step_0(self):
+        '''Obtain spectrum from observed data'''
         asolfile = self.get_data_file('asol')
         evtfile = self.get_data_file('evt2')
         commands = spectrum_from_fluxcorrection(asolfile, evtfile,
@@ -283,29 +303,34 @@ class ACISSPSF(HRCIPSF):
 
     @base.Marx2fits
     def step_2(self):
+        '''Use the EDSER subpixel algorithm'''
         return ('--pixadj=EDSER', 'marx_only', 'marx_only.fits')
 
     @base.Marx2fits
     def step_6(self):
+        '''Same setting as above for comparison'''
         return ('--pixadj=EDSER', 'marx_saotrace', 'marx_saotrace.fits')
 
     @base.Marx2fits
     def step_10(self):
+        '''USE RANDOMAIXE as an alternative to EDSER'''
         return ('--pixadj=RANDOMIZE', 'marx_only', 'marx_only_rand.fits')
 
     @base.Marx2fits
     def step_11(self):
+        '''Again, same settign as above'''
         return ('--pixadj=RANDOMIZE', 'marx_saotrace', 'marx_saotrace_rand.fits')
 
     @base.Ciao
     def step_12(self):
+        '''Reprocess the observation with RANDOMIZE'''
         evt2 = self.get_data_file('evt2')
         asol = self.get_data_file('asol')
         return ['acis_process_events infile={evt} outfile=obs_rand.fits acaofffile={asol} doevtgrade=no calculate_pi=no pix_adj=RANDOMIZE clobber=yes'.format(evt=evt2, asol=asol)]
 
     @base.Python
     def step_20(self):
-
+        '''Compare radial event distributions'''
         filterargs = {'energy': [300, 3000],
                       'circle': (self.source['x'], self.source['y'],
                                  5 * self.source['r'])
@@ -401,8 +426,11 @@ simplification that the |marx| mirror model makes.'''
 
     @base.Ciao
     def step_0(self):
-        # Use one of the asol files only.
-        # Good enough for this example and simpler than stack syntax
+        '''Get spectrum from flux correction
+
+        Use one of the asol files in only.
+        Good enough for this example and simpler than stack syntax
+        '''
         asol2 = self.get_data_file('N002_asol')
         os.remove(asol2)
         asolfile = self.get_data_file('asol')
@@ -417,4 +445,5 @@ simplification that the |marx| mirror model makes.'''
 
     @base.Ciao
     def step_20(self):
+        '''ds9 images of the PSF'''
         return ['''ds9 -width 800 -height 500 -log -cmap heat {0} marx_only.fits marx_saotrace.fits -pan to 5256 6890 physical -bin about 5256 6890 -match frame wcs -match bin -frame 1 -regions command 'text 5:39:27.987 -69:43:52.31 # text=Observation font="helvetica 24"' -frame 2 -regions command 'text 5:39:27.987 -69:43:52.31 # text="only MARX" font="helvetica 24"' -frame 3 -regions command 'text 5:39:27.987 -69:43:52.31 # text=SAOTrace font="helvetica 24"' -saveimage {1} -exit'''.format(self.get_data_file('evt2'), self.figpath(self.figures.keys()[0]))]

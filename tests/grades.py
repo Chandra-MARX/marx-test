@@ -81,12 +81,14 @@ In this particular case, there is very little source signal above 2 keV, so the 
 
     @base.Ciao
     def step_0(self):
+        '''Download data, extract point source'''
         evt2 = self.get_data_file('evt2')
         return ["punlearn dmcopy",
                 'dmcopy "{0}[sky=circle(4096,4073,6)]" obs.fits clobber=yes'.format(evt2)]
 
     @base.Marx
     def step_1(self):
+        '''Run in energy band, match observational setup'''
         asol = self.get_data_file('asol')
         evt2 = self.get_data_file('evt2')
         pars = marxpars_from_asol(asol, evt2)
@@ -96,10 +98,12 @@ In this particular case, there is very little source signal above 2 keV, so the 
 
     @base.Marx2fits
     def step_2(self):
+        '''use EDSER'''
         return ('--pixadj=EDSER', 'point', 'marxsim.fits')
 
     @base.Python
     def step_3(self):
+        '''Plot grade distribution'''
         obs = Table.read(os.path.join(self.basepath, 'obs.fits'), hdu=1)
         sim = Table.read(os.path.join(self.basepath, 'marxsim.fits'), hdu=1)
 
@@ -120,12 +124,14 @@ class ACIS_FI(ACIS_BI_low_energy):
 
     @base.Ciao
     def step_0(self):
+        '''Download data, extract point source'''
         evt2 = self.get_data_file('evt2')
         return ["punlearn dmcopy",
                 'dmcopy "{0}[sky=circle(4072,4065,5)]" obs.fits clobber=yes'.format(evt2)]
 
     @base.Marx
     def step_1(self):
+        '''Run in energy band, match observational setup'''
         asol = self.get_data_file('asol')
         evt2 = self.get_data_file('evt2')
         pars = marxpars_from_asol(asol, evt2)
@@ -135,6 +141,7 @@ class ACIS_FI(ACIS_BI_low_energy):
 
     @base.Python
     def step_3(self):
+        '''Plot grade distribution'''
         obs = Table.read(os.path.join(self.basepath, 'obs.fits'), hdu=1)
         sim = Table.read(os.path.join(self.basepath, 'marxsim.fits'), hdu=1)
 

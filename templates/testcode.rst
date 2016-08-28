@@ -13,8 +13,9 @@
 ------------------------------------------------------------------------------
 {% for step in testinst.steplist %}
 
-{{ step.__name__ }} : {{ step.program }}
+{{ step.program }} : {{ step.title}}
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+{{ step.description }}
 
 ::
 
