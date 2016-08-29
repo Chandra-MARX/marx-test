@@ -6,9 +6,9 @@ import subprocess
 from glob import glob
 from collections import OrderedDict
 import textwrap
+import ConfigParser
 
 from .utils import download_chandra, ChangeDir
-from .run_external import external_settings
 
 
 class OutputNumber(object):
@@ -57,19 +57,6 @@ class OutputNumber(object):
                 'description': self.description,
                 'unit': self.unit
                 }
-
-def run_external(cmdlist, setup=None, **kwargs):
-    '''
-    Parameters
-    ----------
-    cmdlist : list
-        List of shell commands to be executed
-    setup : string or None
-        If this is a string, then ``cmdlist`` is prefixed with the
-        corresponding entry in ``external_setup``.
-    '''
-    subprocess.call([external_settings[setup] + '\n' + '\n'.join(cmdlist)],
-                    shell=True, **kwargs)
 
 
 class ExternalBaseWrapper(object):
@@ -121,7 +108,13 @@ class ExternalBaseWrapper(object):
             else:
                 return ''
 
-    def __call__(self, obj):
+    def __call__(self, obj, conf):
+        '''
+        Parameters
+        ----------
+        conf : `~ConfigParser.ConfigParser` instance
+            The configures the path to external programs like marx.
+        '''
         self.f(obj)
 
     def __get__(self, instance, cls=None):
@@ -158,7 +151,7 @@ class Python(ExternalBaseWrapper):
                     fsource = textwrap.dedent(''.join(inspect.getsourcelines(v)[0])) + '\n' + fsource
         return fsource
 
-    def __call__(self, obj):
+    def __call__(self, obj, conf):
         return self.f(obj)
 
 
@@ -166,7 +159,7 @@ class Sherpa(ExternalBaseWrapper):
     '''Wrap a Sherpa script.
 
     The wrapped function should return a single string
-    (possibly with \n in there). In order to execute that, it is written
+    (possibly with ``\\n`` in there). In order to execute that, it is written
     to a temporary file and executed in a subshell after proper CIAO
     initialization.
     '''
@@ -176,10 +169,11 @@ class Sherpa(ExternalBaseWrapper):
     def source(self):
         return self.f(self.instance).replace(self.instance.basepath + '/', '')
 
-    def __call__(self, obj):
+    def __call__(self, obj, conf):
         with open('sherpa_script.py', 'w') as f:
             f.write(self.f(obj))
-        run_external(['sherpa -b sherpa_script.py'], setup='CIAO', cwd=obj.basepath)
+        subprocess.call([conf.get('CIAO', 'setup') + '\nsherpa -b sherpa_script.py'],
+                         cwd=obj.basepath, shell=True)
 
 
 class Ciao(ExternalBaseWrapper):
@@ -196,8 +190,10 @@ class Ciao(ExternalBaseWrapper):
     def source(self):
         return '\n'.join(self.f(self.instance)).replace(self.instance.basepath + '/', '')
 
-    def __call__(self, obj):
-        run_external(self.f(obj), setup=self.program, cwd=obj.basepath)
+    def __call__(self, obj, conf):
+        commands = self.f(obj)
+        commands.insert(0, conf.get(self.program, 'setup'))
+        subprocess.call(['\n'.join(commands)], shell=True, cwd=obj.basepath)
 
 
 class Marx(ExternalBaseWrapper):
@@ -218,15 +214,15 @@ class Marx(ExternalBaseWrapper):
 
         return ' '.join(marxcall).replace(self.instance.basepath + '/', '')
 
-    def __call__(self, obj):
+    def __call__(self, obj, conf):
         '''Assemble string for marxcall using path information from env.'''
         par = self.f(self.instance)
         marxcall = ['{0}={1}'.format(k, v) for k, v in par.iteritems()]
-        marxcall.insert(0, os.path.join(external_settings['marxpath'],
+        marxcall.insert(0, os.path.join(conf.get('marx', 'binpath'),
                                         self.program))
-        marxcall.insert(1, '@@{0}'.format(external_settings[self.program + 'parfile']))
+        marxcall.insert(1, '@@{0}'.format(conf.get('marx', self.program + 'parfile')))
 
-        run_external([' '.join(marxcall)], cwd=obj.basepath)
+        subprocess.call([' '.join(marxcall)], shell=True, cwd=obj.basepath)
 
 
 class Marxasp(Marx):
@@ -244,9 +240,9 @@ class Marx2fits(ExternalBaseWrapper):
 
     def __call__(self, obj):
         options, marxdir, outfile = self.f(self.instance)
-        marx2fitscall = ' '.join([os.path.join(external_settings['marxpath'], self.program),
+        marx2fitscall = ' '.join([os.path.join(conf.get('marx', 'binpath'), self.program),
                                   options, marxdir, outfile])
-        run_external([marx2fitscall], cwd=obj.basepath)
+        subprocess.call([marx2fitscall], shell=True, cwd=obj.basepath)
 
 
 class SAOTraceLua(ExternalBaseWrapper):
@@ -256,7 +252,7 @@ class SAOTraceLua(ExternalBaseWrapper):
     def source(self):
         return self.f(self.instance)
 
-    def __call__(self, obj):
+    def __call__(self, obj, conf):
         with open('saotrace_source.lua', 'w') as f:
             for line in self.f(obj):
                 f.write(line)
@@ -272,18 +268,8 @@ class MarxTest(object):
 
     Parameters
     ----------
-    env : dict
-        This dictionary holds the configuration of the test environment.
-        The following keys are required:
-
-        - temppath: path to a directory used for temporary files (e.g. data download,
-          CIAO output etc.). The tests will create appropriate sub-directories.
-          To aid debugging, this directory is **not** automatically deleted
-          when the tests are done. However, removing it will not impact the
-          webpages that summarize the test results.
-        - outpath: path to a directory used for permanent output (final diagnostic
-          figures, goodness-of-fit tables, html files etc.)
-        - plotformat: defaults to 'png' is not given.
+    conffile : string
+        Path and filename for marxtest configuration file
     '''
 
     obsid = None
@@ -295,10 +281,11 @@ class MarxTest(object):
 
     figures = OrderedDict()
 
-    def __init__(self, env):
-        self.env = env
-        self.env['outpath'] = os.path.abspath(env['outpath'])
-        self.basepath = os.path.abspath(os.path.join(self.env['temppath'],
+    def __init__(self, conffile):
+        self.conf = ConfigParser.ConfigParser()
+        self.conf.read(conffile)
+        self.outpath = os.path.abspath(self.conf.get('Output', 'outpath'))
+        self.basepath = os.path.abspath(os.path.join(self.conf.get('Output','temppath'),
                                                      self.name))
         if hasattr(self, 'obsid') and self.download_all:
             download_chandra(self.obsid, self.datapath)
@@ -328,12 +315,13 @@ class MarxTest(object):
             of the test, the input ``name`` and the file format defined in
             ``env['plotformat']``.
         '''
-        if not os.path.exists(os.path.join(self.env['outpath'], 'figures')):
-            os.makedirs(os.path.join(self.env['outpath'], 'figures'))
+        fileformat = self.conf.get('Outout', 'plotformat')
+        if not os.path.exists(os.path.join(self.outpath, 'figures')):
+            os.makedirs(os.path.join(self.outpath, 'figures'))
 
-        return os.path.join(self.env['outpath'], 'figures',
+        return os.path.join(self.outpath, 'figures',
                             '{0}_{1}.{2}'.format(self.name, name,
-                                                  self.env.get('plotformat', 'png')))
+                                                 fileformat))
 
     @property
     def steplist(self):
@@ -344,12 +332,12 @@ class MarxTest(object):
     def run(self):
         self.pkg_data = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                                      'tests', 'data'))
-        if not os.path.exists(self.env['outpath']):
-                os.makedirs(self.env['outpath'])
+        if not os.path.exists(self.outpath):
+                os.makedirs(self.outpath)
 
         with ChangeDir(self.basepath):
             for step in self.steplist:
-                step()
+                step(self.conf)
 
     def get_data_file(self, filetype):
         filename = glob(os.path.join(self.datapath,

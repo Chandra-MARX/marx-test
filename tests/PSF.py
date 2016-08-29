@@ -295,7 +295,8 @@ class ACISSPSF(HRCIPSF):
         '''Obtain spectrum from observed data'''
         asolfile = self.get_data_file('asol')
         evtfile = self.get_data_file('evt2')
-        commands = spectrum_from_fluxcorrection(asolfile, evtfile,
+        commands = spectrum_from_fluxcorrection(self.conf,
+                                                asolfile, evtfile,
                                                 self.source['x'],
                                                 self.source['y'],
                                                 self.source_reg)
@@ -437,7 +438,8 @@ simplification that the |marx| mirror model makes.'''
         evt2 = self.get_data_file('N002_evt2')
         os.remove(evt2)
         evtfile = self.get_data_file('evt2')
-        commands = spectrum_from_fluxcorrection(asolfile, evtfile,
+        commands = spectrum_from_fluxcorrection(self.conf,
+                                                asolfile, evtfile,
                                                 self.source['x'],
                                                 self.source['y'],
                                                 self.source_reg)

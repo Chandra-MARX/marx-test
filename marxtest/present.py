@@ -3,10 +3,8 @@ from os.path import join as pjoin
 import os
 import jinja2
 
-from .tests import modulelist
 
-
-def write_summary_rst(env):
+def write_summary_rst(conf):
     '''Write TOC pages.
 
     This function imports (but does not run) all test modules,
@@ -26,20 +24,24 @@ def write_summary_rst(env):
 
     Parameters
     ----------
-    env : dict
-        Dictionary with a ket ``outpath``.
+    conf : `~ConfigParser.ConfigParser` instance
+        Configuration settings with contain path information
     '''
-    jinjaenv = jinja2.Environment(loader=jinja2.PackageLoader('marxtest', 'templates'))
+    jinjaenv = jinja2.Environment(loader=jinja2.FileSystemLoader(conf.get('Output', 'templates')))
     testindex = jinjaenv.get_template('testindex.rst')
     codeindex = jinjaenv.get_template('codelist.rst')
 
     if not os.path.exists(env['outpath']):
         os.makedirs(env['outpath'])
 
+    # Get tests fomr test module
+    sys.path.append(conf.get('tests', 'path'))
+    main_module = importlib.import_module(conf.get('tests', 'modulename'))
+
     # write module and code pages
     codelist = []
-    for module in modulelist:
-        imp_module = importlib.import_module('marxtest.tests.' + module)
+    for module in main_module.modulelist:
+        imp_module = importlib.import_module(conf.get('tests', 'modulename') + '.' + module)
         for t in imp_module.tests:
             testclass = getattr(imp_module, t)
             testinst = testclass(env)
@@ -54,17 +56,18 @@ def write_summary_rst(env):
         f.write(codeindex.render(codelist=codelist))
 
 
-def run_and_output(env, run=True, modules=None, tests=None):
-    '''
+def run_and_output(conf, run=True, modules=None, tests=None):
+    '''Run tests and output results.
 
     Parameters
     ----------
-    env : dict
-        Dictionary with a key ``outpath``.
+    conf : `~ConfigParser.ConfigParser` instance
+        Configuration settings with contain path information
     run : boolean
         If ``True`` tests will be executed, otherwise test results
         already on disk from a previous run will be parsed to generate
-        the rst output.
+        the rst output. This option is useful, if just the templates for
+        the rst files have changed. It may not work for all tests.
     modules : list of strings or None
         If set, this defines the list of test modules to run and write.
         If ``None``, use ``tests.modulelist``.
@@ -72,7 +75,7 @@ def run_and_output(env, run=True, modules=None, tests=None):
         If set, only tests with a name listed in ``tests`` will be run and
         generate rst output. Can be used in combination with ``modules``.
     '''
-    jinjaenv = jinja2.Environment(loader=jinja2.PackageLoader('marxtest', 'templates'))
+    jinjaenv = jinja2.Environment(loader=jinja2.FileSystemLoader(conf.get('Output', 'templates')))
     testlisttemp = jinjaenv.get_template('testlist.rst')
     codetemp = jinjaenv.get_template('testcode.rst')
 

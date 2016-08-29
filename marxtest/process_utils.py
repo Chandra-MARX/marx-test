@@ -5,8 +5,6 @@ from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy.coordinates.name_resolve import NameResolveError
 
-from .run_external import external_settings
-
 
 def detectorfromkeyword(keyword):
     '''Determine detector type form fits header keyword
@@ -113,7 +111,7 @@ def marxpars_from_asol(asolfile, evt2file):
     return marx_pars
 
 
-def spectrum_from_fluxcorrection(asolfile, evtfile, x, y, region, psffrac=1):
+def spectrum_from_fluxcorrection(conf, asolfile, evtfile, x, y, region, psffrac=1):
     '''Estimate a source spectrum through flux correction.
 
     We will simply extract the counts in a region containing the observed PSF
@@ -124,6 +122,8 @@ def spectrum_from_fluxcorrection(asolfile, evtfile, x, y, region, psffrac=1):
 
     Parameters
     ----------
+    conf : `~ConfigParser.ConfigParser` instance
+        The configuration file contains the initialization code for CIAO.
     asolfile : string
         Path and filename of asolfile
     evtfile : string
@@ -154,7 +154,7 @@ def spectrum_from_fluxcorrection(asolfile, evtfile, x, y, region, psffrac=1):
                                                             asol=asolfile, x=x, y=y),
                'pget dmcoords chip_id'
               ]
-    ccd_id = subprocess.check_output([external_settings['CIAO'] + '\n' + '\n'.join(cmdlist)],
+    ccd_id = subprocess.check_output([conf.get('CIAO', 'setup') + '\n' + '\n'.join(cmdlist)],
                     shell=True)
     ccd_id = ccd_id.split('\n')[-2]
 
