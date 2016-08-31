@@ -1,10 +1,35 @@
 import importlib
+from ConfigParser import ConfigParser
 from os.path import join as pjoin
 import os
+import sys
 import jinja2
 
 
-def write_summary_rst(conf):
+__all__ = ['write_summary_rst', 'run_and_output']
+
+
+def setup_env(conffile):
+    '''
+    Parameters
+    ----------
+    conffile : string
+        Path and name of configuration file
+    '''
+    conf = ConfigParser()
+    conf.read(conffile)
+    outpath = conf.get('Output', 'outpath')
+
+    jinjaenv = jinja2.Environment(loader=jinja2.FileSystemLoader(conf.get('Output', 'templates')))
+
+    # Get tests fomr test module
+    sys.path.append(conf.get('tests', 'path'))
+    main_module = importlib.import_module(conf.get('tests', 'modulename'))
+
+    return conf, outpath, jinjaenv, main_module.modulelist
+
+
+def write_summary_rst(conffile):
     '''Write TOC pages.
 
     This function imports (but does not run) all test modules,
@@ -24,45 +49,42 @@ def write_summary_rst(conf):
 
     Parameters
     ----------
-    conf : `~ConfigParser.ConfigParser` instance
-        Configuration settings with contain path information
+    conffile : string
+        Path and name of configuration file
     '''
-    jinjaenv = jinja2.Environment(loader=jinja2.FileSystemLoader(conf.get('Output', 'templates')))
+    conf, outpath, jinjaenv, modulelist = setup_env(conffile)
+
     testindex = jinjaenv.get_template('testindex.rst')
     codeindex = jinjaenv.get_template('codelist.rst')
 
-    if not os.path.exists(env['outpath']):
-        os.makedirs(env['outpath'])
-
-    # Get tests fomr test module
-    sys.path.append(conf.get('tests', 'path'))
-    main_module = importlib.import_module(conf.get('tests', 'modulename'))
+    if not os.path.exists(outpath):
+        os.makedirs(outpath)
 
     # write module and code pages
     codelist = []
-    for module in main_module.modulelist:
+    for module in modulelist:
         imp_module = importlib.import_module(conf.get('tests', 'modulename') + '.' + module)
         for t in imp_module.tests:
             testclass = getattr(imp_module, t)
-            testinst = testclass(env)
+            testinst = testclass(conf)
             codelist.append(testinst.name)
 
     # write intro
-    with open(pjoin(env['outpath'], 'index.rst'), 'w') as f:
+    with open(pjoin(outpath, 'index.rst'), 'w') as f:
         f.write(testindex.render(modulelist=modulelist))
 
     # write codelist because every page must be in some TOC tree
-    with open(pjoin(env['outpath'], 'listofcode.rst'), 'w') as f:
+    with open(pjoin(outpath, 'listofcode.rst'), 'w') as f:
         f.write(codeindex.render(codelist=codelist))
 
 
-def run_and_output(conf, run=True, modules=None, tests=None):
+def run_and_output(conffile, run=True, modules=None, tests=None):
     '''Run tests and output results.
 
     Parameters
     ----------
-    conf : `~ConfigParser.ConfigParser` instance
-        Configuration settings with contain path information
+    conffile : string
+        Path and name of configuration file.
     run : boolean
         If ``True`` tests will be executed, otherwise test results
         already on disk from a previous run will be parsed to generate
@@ -75,31 +97,31 @@ def run_and_output(conf, run=True, modules=None, tests=None):
         If set, only tests with a name listed in ``tests`` will be run and
         generate rst output. Can be used in combination with ``modules``.
     '''
-    jinjaenv = jinja2.Environment(loader=jinja2.FileSystemLoader(conf.get('Output', 'templates')))
+    conf, outpath, jinjaenv, modulelist = setup_env(conffile)
     testlisttemp = jinjaenv.get_template('testlist.rst')
     codetemp = jinjaenv.get_template('testcode.rst')
 
-    if not os.path.exists(pjoin(env['outpath'], 'code')):
-        os.makedirs(pjoin(env['outpath'], 'code'))
+    if not os.path.exists(pjoin(outpath, 'code')):
+        os.makedirs(pjoin(outpath, 'code'))
 
     # write module and code pages
     if modules is None:
         modules = modulelist
     for module in modules:
-        imp_module = importlib.import_module('marxtest.tests.' + module)
+        imp_module = importlib.import_module('tests.' + module)
         t_list = []
         for t in imp_module.tests:
             # If tests is set, only run tests mentioned in that list
             if (tests is not None) and (t not in tests):
                 continue
             testclass = getattr(imp_module, t)
-            testinst = testclass(env)
+            testinst = testclass(conf)
             if run:
                 testinst.run()
             t_list.append(testinst)
-            with open(pjoin(env['outpath'], 'code', t + '.rst'), 'w') as f:
+            with open(pjoin(outpath, 'code', t + '.rst'), 'w') as f:
                 f.write(codetemp.render(testinst=testinst))
-        with open(pjoin(env['outpath'], module + '.rst'), 'w') as f:
+        with open(pjoin(outpath, module + '.rst'), 'w') as f:
             f.write(testlisttemp.render(module=imp_module,
                                         testinstances=t_list,
                                         figpath='figures')
