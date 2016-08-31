@@ -10,6 +10,7 @@ This small help file documents the ``marx-test`` module. The source code can be 
    marxtest.present
    marxtest.process_utils
    marxtest.utils
+   marxtest.database
 
 Module contents
 ---------------

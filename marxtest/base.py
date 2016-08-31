@@ -6,57 +6,8 @@ import subprocess
 from glob import glob
 from collections import OrderedDict
 import textwrap
-import ConfigParser
 
 from .utils import download_chandra, ChangeDir
-
-
-class OutputNumber(object):
-    '''
-    '''
-    max_title_length = 20
-
-    def __init__(self, testname, value, title, unit='',
-                 error=None, expected=None, description=None):
-        self.testname = testname
-        self.value = value
-        self._title = title
-        self.error = error
-        self.expected = expected
-        self.unit = unit
-        self._description = description
-
-    @property
-    def title(self):
-        return self._title
-
-    @title.setter
-    def title(self, title):
-        if len(title) > self.max_title_length:
-            raise ValueError('Title can only be {0} characters long'.format(self.max_title_length))
-        else:
-            self._title = title
-
-    @property
-    def description(self):
-        if self._description is not None:
-            return self._description
-        else:
-            return self.title
-
-    @description.setter
-    def description(self, description):
-        self._description = description
-
-    def to_dict(self):
-        return {'testname': self.testname,
-                'value': self.value,
-                'title': self.title,
-                'error': self.error,
-                'expected': self.expected,
-                'description': self.description,
-                'unit': self.unit
-                }
 
 
 class ExternalBaseWrapper(object):
@@ -221,7 +172,6 @@ class Marx(ExternalBaseWrapper):
         marxcall.insert(0, os.path.join(conf.get('marx', 'binpath'),
                                         self.program))
         marxcall.insert(1, '@@{0}'.format(conf.get('marx', self.program + 'parfile')))
-
         subprocess.call([' '.join(marxcall)], shell=True, cwd=obj.basepath)
 
 
@@ -238,7 +188,7 @@ class Marx2fits(ExternalBaseWrapper):
         options, marxdir, outfile = self.f(self.instance)
         return ' '.join([self.program, options, marxdir, outfile]).replace(self.instance.basepath + '/', '')
 
-    def __call__(self, obj):
+    def __call__(self, obj, conf):
         options, marxdir, outfile = self.f(self.instance)
         marx2fitscall = ' '.join([os.path.join(conf.get('marx', 'binpath'), self.program),
                                   options, marxdir, outfile])
@@ -268,8 +218,8 @@ class MarxTest(object):
 
     Parameters
     ----------
-    conffile : string
-        Path and filename for marxtest configuration file
+    conf : `~ConfigParser.ConfigParser`
+        Configuration Parser with appropriate configuration file loaded
     '''
 
     obsid = None
@@ -281,9 +231,14 @@ class MarxTest(object):
 
     figures = OrderedDict()
 
-    def __init__(self, conffile):
-        self.conf = ConfigParser.ConfigParser()
-        self.conf.read(conffile)
+    version = 1
+    '''If the definition of a test changes so that results cannot be
+    compared to previous runs any longer, the version needs to be incremented.
+    However, usually it is better to rename the test.
+    '''
+
+    def __init__(self, conf):
+        self.conf = conf
         self.outpath = os.path.abspath(self.conf.get('Output', 'outpath'))
         self.basepath = os.path.abspath(os.path.join(self.conf.get('Output','temppath'),
                                                      self.name))
@@ -311,11 +266,11 @@ class MarxTest(object):
         Returns
         -------
         pathname : string
-            File and complete filename. The filename is composed of the name
-            of the test, the input ``name`` and the file format defined in
-            ``env['plotformat']``.
+            File path and complete filename. The filename is composed of the
+            name of the test, the input ``name`` and the file format defined in
+            the configuration file.
         '''
-        fileformat = self.conf.get('Outout', 'plotformat')
+        fileformat = self.conf.get('Output', 'plotformat')
         if not os.path.exists(os.path.join(self.outpath, 'figures')):
             os.makedirs(os.path.join(self.outpath, 'figures'))
 
