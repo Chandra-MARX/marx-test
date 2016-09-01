@@ -8,6 +8,7 @@ from collections import OrderedDict
 import textwrap
 
 from .utils import download_chandra, ChangeDir
+from . import database
 
 
 class ExternalBaseWrapper(object):
@@ -237,6 +238,8 @@ class MarxTest(object):
     However, usually it is better to rename the test.
     '''
 
+    expresults = []
+
     def __init__(self, conf):
         self.conf = conf
         self.outpath = os.path.abspath(self.conf.get('Output', 'outpath'))
@@ -244,6 +247,14 @@ class MarxTest(object):
                                                      self.name))
         if hasattr(self, 'obsid') and self.download_all:
             download_chandra(self.obsid, self.datapath)
+
+        for t in self.expresults:
+            database.insert_expected_result(self.conf, self.name, t['name'],
+                                            self.version, t['value'],
+                                            t['title'],
+                                            t.get('description', ''),
+                                            t.get('unit', ''),
+                                            t.get('acceptable', None))
 
     @property
     def name(self):
@@ -307,3 +318,7 @@ class MarxTest(object):
 
         else:
             raise ValueError('Specification not unique. Found {0}'.format(filename))
+
+    def save_test_result(self, testname, value, sigma=None, sigma2=None):
+        database.insert_test_run(self.conf, self.name, testname, self.version,
+                                 value, sigma, sigma2)

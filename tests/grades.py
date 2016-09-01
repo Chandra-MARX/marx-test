@@ -9,9 +9,9 @@ from collections import OrderedDict
 from matplotlib import pyplot as plt
 from astropy.table import Table
 
-from .. import base
-from ..utils import colname_case
-from ..process_utils import marxpars_from_asol
+from marxtest import base
+from marxtest.utils import colname_case
+from marxtest.process_utils import marxpars_from_asol
 
 tests = ['ACIS_BI_low_energy', 'ACIS_FI']
 

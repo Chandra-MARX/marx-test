@@ -11,11 +11,12 @@ from matplotlib import pyplot as plt
 from astropy.table import Table
 from astropy.io import fits
 
-from .. import base
-from ..utils import colname_case as cc
+from marxtest import base
+from marxtest.utils import colname_case as cc
 
-from ..process_utils import (marxpars_from_asol, spectrum_from_fluxcorrection,
-                             target_coos_from_asol)
+from marxtest.process_utils import (marxpars_from_asol,
+                                    spectrum_from_fluxcorrection,
+                                    target_coos_from_asol)
 
 tests = ['ACISSPSF', 'ACISIPSF', 'HRCIPSF', 'OffAxisPSF']
 

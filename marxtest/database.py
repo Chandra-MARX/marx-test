@@ -27,43 +27,35 @@ def setup(f):
     @wraps(f)
     def wrapper(conf, *args, **kwds):
 
-        global con, marxver, saotracever, ciaover, caldbver, configid
+        global con, configdict, configid
 
-        if con is NONE:
+        if len(configdict) == 0:
+            set_configdict(conf)
+
+        if con is None:
             con = sqlite3.connect(conf.get('Output', 'sqlitedb'))
             con.row_factory = sqlite3.Row
 
             con.execute("CREATE TABLE IF NOT EXISTS config (marx STRING, ciao STRING, caldb string,  saotrace STRING, compiler STRING, compilerversion STRING, compilerflags STRING, host STRING);")
-            con.execute("CREATE TABLE IF NOT EXISTS expresult (testclass STRING NOT NULL, name STRING, version INTEGER, title STRING CHECK(LENGTH(title) <= 20), description STRING, value NOT NULL, unit STRING, acceptable, pass INTEGER) PRIMARY KEY (testclass, name, version);")
+            con.execute("CREATE TABLE IF NOT EXISTS expresult (testclass STRING NOT NULL, name STRING, version INTEGER, title STRING CHECK(LENGTH(title) <= 20), description STRING, value, unit STRING, acceptable, PRIMARY KEY (testclass, name, version));")
             con.execute("CREATE TABLE IF NOT EXISTS result (configid INTEGER, expid INTEGER, value, sigma, sigma2);")
 
-            con.execute("CREATE TABLE person (id integer primary key, firstname varchar unique)")
+        cur = con.execute("SELECT rowid FROM config WHERE marx=:marx AND ciao=:ciao AND caldb=:caldb AND saotrace=:saotrace AND compiler=:compiler AND compilerversion=:compilerversion AND compilerflags=:compilerflags and host=:host", configdict)
 
-        if marxver is None:
-            marxver = marx_version(conf)
-
-        if saotracever is None:
-            saotracever = saotrace_version(conf)
-
-        if (ciaover) is None or (caldbver is None):
-            ciaover, caldbver = ciaocaldb_version(conf)
-
-        con.execute("SELECT rowid FROM config WHERE marx:=marx AND ciao:=ciao AND caldb:=caldb AND saptrace:=saotrace AND compiler:=compiler AND compilerversion:=compilerversion AND compilerflags:=compilerflags and host:=host", configdict)
-
-        rows = con.fetchall()
+        rows = cur.fetchall()
         if len(rows) == 0:
-            con.ececute('INSERT INTO config VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                        [configdict[n] for n in ['marx', 'ciao', 'caldb',
-                                                 'saotrace', 'compiler',
-                                                 'compilerversion',
-                                                 'compilerflags', 'host']])
-            configid = con.lastrowid
+            cur = con.execute('INSERT INTO config VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                              [configdict[n] for n in ['marx', 'ciao', 'caldb',
+                                                       'saotrace', 'compiler',
+                                                       'compilerversion',
+                                                       'compilerflags', 'host']])
+            configid = cur.lastrowid
         elif len(rows) == 1:
             configid = rows[0]['rowid']
         else:
             raise InconsistentDBError('Most than one row in table config matches current configuration.')
 
-        return f(*args, **kwds)
+        return f(conf, *args, **kwds)
     return wrapper
 
 
@@ -77,7 +69,7 @@ def reset_cache():
 
 def set_configdict(conf):
     '''Collect configuration information from different places.'''
-    configdict['marxver'] = marx_version(conf)
+    configdict['marx'] = marx_version(conf)
     ciao, caldb = ciaocaldb_version(conf)
     configdict['ciao'] = ciao
     configdict['caldb'] = caldb
@@ -154,12 +146,14 @@ def saotrace_version(conf):
 
 
 @setup
-def insert_test_run(testclass, testname, testversion,
+def insert_test_run(conf, testclass, testname, testversion,
                     value, sigma=None, sigma2=None):
     """Insert a test result into the results table.
 
     Parameters
     ----------
+    conf : `~ConfigParser.ConfigParser`
+        Test configuration (file paths etc.)
     testclass: string
         Name of the test class that defines a test
     testname: string
@@ -179,16 +173,12 @@ def insert_test_run(testclass, testname, testversion,
         the second number.
     """
 
-    con.execute("SELECT rowid FROM expresult WHERE testclass:=testclass AND name:=name AND version:=version",
-                {'testclass': testclass, 'name': testname,
-                 'version': testversion})
-    expid = con.fetchall()
+    cur = con.execute("SELECT rowid FROM expresult WHERE testclass=:testclass AND name=:name AND version=:version",
+                      {'testclass': testclass, 'name': testname,
+                       'version': testversion})
+    expid = cur.fetchall()
     if len(expid) == 0:
-        with con:
-            warn('Expected result for {0}: {1}, version {2} not found in table expresult. Adding newrow with empty values.'.format(testclass, testname, testversion))
-            con.execute("INSERT INTO expresult(testclass, name, version) VALUES (?, ?, ?)",
-                        (testclass, testname, testversion))
-            expid = con.lastrowid
+        raise InconsistentDBError('No entry for {0}: {1}, version {2} in table expresult.'.format(testclass, testname, testversion))
     elif len(expid) == 1:
         expid = expid[0][0]
     else:
@@ -197,3 +187,46 @@ def insert_test_run(testclass, testname, testversion,
     with con:
         con.execute("INSERT INTO result VALUES (?, ?, ?, ?, ?)",
                     (configid, expid, value, sigma, sigma2))
+
+
+@setup
+def insert_expected_result(conf, testclass, testname, testversion,
+                           value, title, description=None, unit=None,
+                           acceptable=None):
+    """Insert a test description result into the expresults table.
+
+    Parameters
+    ----------
+    conf : `~ConfigParser.ConfigParser`
+        Test configuration (file paths etc.)
+    testclass: string
+        Name of the test class that defines a test
+    testname: string
+        A single test might output more than one number. So, in addition to the
+        name of the test class, a "name" for the result can be set.
+    testversion: string
+        If the definition of a test changes so that results cannot be
+        compared to previous runs any longer, the version needs to be
+        incremented.
+    value: string or float or int
+        Results of the test
+    title: string
+        A title used when results are displayed on websites etc.
+        Limited to 20 characters.
+    description: string
+        Describe the test if more details are needed.
+    unit: string
+        Unit of value. Used for display only.
+    acceptable: float
+        Values are rarely exact. This field defined the maximum deviation
+        from ``value`` that still makes a test pass.
+    """
+    cur = con.execute("SELECT rowid FROM expresult WHERE testclass=:testclass AND name=:name AND version=:version",
+                      {'testclass': testclass, 'name': testname,
+                       'version': testversion})
+    expid = cur.fetchone()
+    if expid is None:
+        with con:
+            cur = con.execute("INSERT INTO expresult(testclass, name, version, title, description, value, unit, acceptable) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                              (testclass, testname, testversion, title,
+                               description, value, unit, acceptable))

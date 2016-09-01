@@ -49,7 +49,6 @@ a spectrum, the expected result would be a certain spectral slope:
 :unit: Unit of value. Used for display only.
 :acceptable: Values are rarely exact. This field defined the maximum deviation
    from ``value`` that still makes a test pass.
-:pass: Pass or fail of a test.
 
 Table ``result``
 ----------------

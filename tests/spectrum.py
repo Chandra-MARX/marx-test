@@ -21,14 +21,19 @@ astrophysical sources, this test is best done with simulated input spectra.
 
 from textwrap import dedent
 import json
+import os
 import numpy as np
 from collections import OrderedDict
 
-from .. import base
+from marxtest import base
 
 tests = ['SpectrumAbsPowACISS', 'SpectrumAPECACISI']
 
 title = 'Reproducing an input spectrum'
+
+
+class ModelComparisonError(Exception):
+    pass
 
 
 class SpectrumAbsPowACISS(base.MarxTest):
@@ -44,6 +49,16 @@ class SpectrumAbsPowACISS(base.MarxTest):
                            ('arf', {'alternative': 'ARFs differ in the range 2-5 keV',
                                     'caption': 'ARFs for both extraction methods (some color as above).'}),
                            ])
+
+    expresults = [{'name': 'chi2marx', 'title': 'chi^2 of input model',
+                   'description': 'chi^2 of the data assuming the input model. The data extraction takes into account MARX li/melkor/d1/guenther/marx/doc/source/tests/spectrum.rstmitations',
+                   'value': 1},
+                  {'name': 'chi2default', 'title': 'chi^2 of input model',
+                   'description': 'chi^2 of the data assuming the input model for a naive extraction, **not** taking into account MARX limitations',
+                   'value': 1},
+                  {'name': 'arfdiff', 'title': 'ARFs: rel diff', 'description': 'Relative difference between a naive arf calcualted with CIAO standard settings and an ARF taking into account MARX limitations. The number is averaged over the entire energy range.',
+                   'value': 0}]
+
 
     _summary = '''
     The table shows how the best fit of the simulated and extracted data compares to the
@@ -70,8 +85,15 @@ class SpectrumAbsPowACISS(base.MarxTest):
     '''
 
     input_model = {'set_source': 'set_source(xsphabs.a * xspowerlaw.p)',
+                   'set_source2': 'set_source(2, a * p)',
                    'parnames': ('a.nH', 'p.PhoIndex', 'p.norm'),
                    'parvals': (1., 1.8, 0.001)}
+    '''Define the spectral model that generates the input spectrum and is
+    fit later.
+    ``set_source2``: Set the same model to data id=2. Yes, this could be made more
+    general and even be extracted automatically, but it's easier to just list
+    the string here.
+    '''
 
     def input_model2Sherpa(self):
         if isinstance(self.input_model['set_source'], list):
@@ -93,46 +115,42 @@ class SpectrumAbsPowACISS(base.MarxTest):
 
     @property
     def summary(self):
-        with open('sherpaout.dat', 'w') as f:
+        with open(os.path.join(self.basepath, 'sherpaout.json')) as f:
             sher = json.load(f)
 
         tablines = []
         for n, v in zip(self.input_model['parnames'], self.input_model['parvals']):
             i = np.nonzero(np.array(sher['fitmarx']['parnames']) == n)[0][0]
-            tablines.append('{0:12} {1:5.2} {2:8.2} {3:8.2} {4:8.2} {5:8.2} {6:8.2} {7:8.2}'.format(n, v,
+            tablines.append('{0:12}  {1:6.2}  {2:8.2}  {3:8.2}  {4:8.2}  {5:8.2}  {6:8.2}  {7:8.2}'.format(n, v,
                                       sher['fitmarx']['parvals'][i],
                                       sher['fitmarx']['parmins'][i],
                                       sher['fitmarx']['parmaxes'][i],
                                       sher['fitdefault']['parvals'][i],
                                       sher['fitdefault']['parmins'][i],
-                                      sher['fitdefault']['parmaxes'][i],
-                                  ))
+                                      sher['fitdefault']['parmaxes'][i]))
         tablines = '\n        '.join(tablines)
+
+        # spaces in next line needed to make dedent work
         summary = '''
         Fit results:
 
-        ============ ===== ========================== ==========================
-        Parameter    Input MARX special extraction    CIAO default extraction
-        ------------ ----- -------------------------- --------------------------
-        name         value value    err_down err_up   value    err_down err_up
-        ============ ===== ======== ======== ======== ======== ======== ========
+        ============  ======  ========  ========  ========  ========  ========  ========
+        Parameter     Input   MARX special extraction       CIAO default extraction
+        ------------  ------  ----------------------------  ----------------------------
+        name          value   value     err_down  err_up    value     err_down  err_up
+        ============  ======  ========  ========  ========  ========  ========  ========
         {tablines}
-        ============ ===== ======== ======== ======== ======== ======== ========
+        ============  ======  ========  ========  ========  ========  ========  ========
+        '''.format(tablines=tablines)
 
-        {summary}
-        '''.format(tablines=tablines, summary=dedent(self._summary))
-
-        return dedent(summary)
+        return dedent(summary) + '\n' + dedent(self._summary)
 
     @base.Sherpa
     def step_1(self):
         '''Generate input spectrum'''
         sherpa = '''
         # set source properties
-        set_source(xsphabs.a * xspowerlaw.p)
-        a.nH = 1.
-        p.PhoIndex = 1.8
-        p.norm = 0.001
+        {srcstring}
         # get source
         my_src = get_source()
 
@@ -144,7 +162,7 @@ class SpectrumAbsPowACISS(base.MarxTest):
         flux = my_src(energies)
 
         save_arrays("marx_input.tbl", [energies[1:], flux[:-1] / bin_width], ["keV","photons/s/cm**2/keV"], ascii=True, clobber=True)
-        '''
+        '''.format(srcstring=self.input_model2Sherpa())
         return dedent(sherpa)
 
     @base.Marx
@@ -246,8 +264,14 @@ class SpectrumAbsPowACISS(base.MarxTest):
         # set source properties
         {srcstring}
 
+        {srcstring2}
+
+        # Check how good the input parameters work
+        statres = get_stat_info()
+        out = {{'chi2marx': statres[0].rstat,
+                'chi2default': statres[1].rstat}}
+
         # Make the plots
-        set_source(2, a * p)
         plot_data(1)
         plot_model(1, overplot=True)
         set_curve({{'*.color': 'forest'}})
@@ -265,51 +289,64 @@ class SpectrumAbsPowACISS(base.MarxTest):
         log_scale(Y_AXIS)
         set_curve({{'*.color': 'orange', 'err.*': 'false', 'symbol.style': 'uptriangle'}})
         set_histogram(['*.color', 'orange'])
-        print_window('{out1}')
+        print_window('{out1}', ['export.clobber', 'True'])
 
         plot_arf(1)
         set_histogram({{'*.color': 'forest'}})
         plot_arf(2, overplot=True)
         set_histogram(['*.color', 'orange'])
-        print_window('{out2}')
+        print_window('{out2}', ['export.clobber', 'True'])
 
         # compile conf outputs for saving
-        out = {{'fitmarx': {{'parnames': c1.parnames,
+        out['fitmarx'] = {{'parnames': c1.parnames,
                            'parmins': c1.parmins,
                            'parvals': c1.parvals,
-                           'parmaxes': c1.parmaxes}},
-               'fitdefault': {{'parnames': c2.parnames,
+                           'parmaxes': c1.parmaxes}}
+        out['fitdefault'] = {{'parnames': c2.parnames,
                               'parmins': c2.parmins,
                               'parvals': c2.parvals,
-                              'parmaxes': c2.parmaxes}},
-               }}
-
+                              'parmaxes': c2.parmaxes}}
 
         # Calculate maximum relative difference in arf
         a1 = get_arf(1)
         a2 = get_arf(2)
         # bring on same energy grid
-        engrid = np.arange(0.35, 10., 0.05)
+        engrid = np.arange(0.3, 10., 0.05)
         a1 = np.interp(engrid, a1.get_x(), a1.get_y())
         a2 = np.interp(engrid, a2.get_x(), a2.get_y())
 
-        out['arfdiff'] = max(np.max(a2/a1), np.max(a1/a2)) - 1
+        out['arfdiff'] = np.mean(np.abs(a2/a1 -1))
 
         # write numbers to file for later
         import json
-        with open('sherpaout.json', 'w') as f:
+        with open('{sherpaout}', 'w') as f:
             json.dump(out, f)
 
         '''.format(srcstring=self.input_model2Sherpa(),
+                   srcstring2=self.input_model['set_source2'],
                    out1=self.figpath(self.figures.keys()[0]),
-                   out2=self.figpath(self.figures.keys()[1]))
+                   out2=self.figpath(self.figures.keys()[1]),
+                   sherpaout=os.path.join(self.basepath, 'sherpaout.json'))
         return dedent(sherpa)
 
     @base.Python
     def step_8(self):
-        '''calculate deviation of fit parameters from input parameters'''
-        with open('sherpaout.json') as f:
+        '''Compare input with fit model
+
+        The input model has several parameters. The calculation here summarizes
+        all that into a single number: The mean deviation between input and fit
+        result as measured in terms of Gaussian sigmas.
+        That is a massive simplification since, the distribution is typically
+        not Gaussian shaped and parameters might not be independent (e.g. there
+        is ambiguity between the absorbing column density and the amount of
+        cool plasma).
+        '''
+        with open(os.path.join(self.basepath, 'sherpaout.json')) as f:
             sherpaout = json.load(f)
+
+        self.save_test_result('chi2marx', sherpaout['chi2marx'])
+        self.save_test_result('chi2default', sherpaout['chi2default'])
+        self.save_test_result('arfdiff', sherpaout['arfdiff'])
 
 
 class SpectrumAPECACISI(SpectrumAbsPowACISS):
@@ -320,8 +357,9 @@ class SpectrumAPECACISI(SpectrumAbsPowACISS):
     title = 'Two thermal components on ACIS-I'
 
     _summary = '''
-    The table shows how the best fit of the simulated and extracted data compares to the
-    parameter values that were used to generate the input spectrum.
+    The table shows how the best fit of the simulated and extracted data
+    compares to the parameter values that were used to generate the input
+    spectrum.
 
     See above for a detailed description.
     '''
@@ -340,5 +378,6 @@ class SpectrumAPECACISI(SpectrumAbsPowACISS):
     input_model = {'set_source': ['set_source(xsvapec.a1 + xsvapec.a2)',
                                   'a1.Ne.frozen = False',
                                   'a2.Ne = a1.Ne'],
+                   'set_source2': 'set_source(2, a1 + a2)',
                    'parnames': ('a1.kT', 'a1.Ne', 'a1.norm', 'a2.kT', 'a2.norm'),
                    'parvals': (0.7, 2.0, 0.00005, 2.0, 0.0001)}
