@@ -296,8 +296,9 @@ class MarxTest(object):
         return [getattr(self, s) for s in steplist]
 
     def run(self):
-        self.pkg_data = os.path.abspath(os.path.join(os.path.dirname(__file__),
-                                                     'tests', 'data'))
+        self.pkg_data = os.path.join(self.conf.get('tests', 'path'),
+                                     self.conf.get('tests', 'modulename'),
+                                     'data')
         if not os.path.exists(self.outpath):
                 os.makedirs(self.outpath)
 
@@ -305,13 +306,34 @@ class MarxTest(object):
             for step in self.steplist:
                 step(self.conf)
 
-    def get_data_file(self, filetype):
+    def get_data_file(self, filetype, download=True):
+        '''Retrieve filename for a Chandra data file.
+
+        Parameters
+        ----------
+        filetype : string
+            A string that includes part of the filename, e.g. ``evt2``.
+        download : bool
+            If ``True`` a file that is not found on disk, will be downloaded
+            from the Chandra ftp archive, is possible.
+
+        Returns
+        -------
+        filename : string or None
+            Return filename and full path in the local directory structure.
+            If a file is not found locally and download if ``False`` (or the
+            file does not exist in the ftp archive either), the filename is
+            set to ``None``. Check the spelling of ``filetype``!
+        '''
         filename = glob(os.path.join(self.datapath,
                                      '*',  # primary or secondary
                                      '*{0}*'.format(filetype)))
         if len(filename) == 0:
-            download_chandra(self.obsid, self.datapath, [filetype])
-            return self.get_data_file(filetype)
+            if download:
+                download_chandra(self.obsid, self.datapath, [filetype])
+                return self.get_data_file(filetype, download=False)
+            else:
+                return None
 
         elif len(filename) == 1:
             return filename[0]
