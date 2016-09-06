@@ -15,8 +15,7 @@ from marxtest import base
 from marxtest.utils import colname_case as cc
 
 from marxtest.process_utils import (marxpars_from_asol,
-                                    spectrum_from_fluxcorrection,
-                                    target_coos_from_asol)
+                                    spectrum_from_fluxcorrection)
 
 tests = ['ACISSPSF', 'ACISIPSF', 'HRCIPSF', 'OffAxisPSF']
 
@@ -258,6 +257,22 @@ point{{ position = {{ ra = {ra},
 
         fig.savefig(self.figpath(self.figures.keys()[0]))
 
+    # @base.Python
+    # def step_100(self):
+    #     '''Compare obs and sim data
+
+    #     The most important question to ask here is:
+    #     What is the error that I make when I assume the MARX PSF is correct?
+
+    #     In this function, we try to summarize this question in a few numbers.
+    #     '''
+    #     with open(os.path.join(self.basepath, 'sherpaout.json')) as f:
+    #         sherpaout = json.load(f)
+
+    #     self.save_test_result('chi2marx', sherpaout['chi2marx'])
+    #     self.save_test_result('chi2default', sherpaout['chi2default'])
+    #     self.save_test_result('arfdiff', sherpaout['arfdiff'])
+
 
 class ACISSPSF(HRCIPSF):
     '''
@@ -409,7 +424,7 @@ class OffAxisPSF(HRCIPSF):
     '''
 
     title = 'Off-axis PSF'
-    obsid = 15713
+    obsid = 1068
     download_all = True
 
     figures = OrderedDict([('ds9', {'alternative': 'Three very similar PSFs.',
@@ -433,11 +448,7 @@ simplification that the |marx| mirror model makes.'''
         Use one of the asol files in only.
         Good enough for this example and simpler than stack syntax
         '''
-        asol2 = self.get_data_file('N002_asol')
-        os.remove(asol2)
         asolfile = self.get_data_file('asol')
-        evt2 = self.get_data_file('N002_evt2')
-        os.remove(evt2)
         evtfile = self.get_data_file('evt2')
         commands = spectrum_from_fluxcorrection(self.conf,
                                                 asolfile, evtfile,
