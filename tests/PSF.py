@@ -17,9 +17,75 @@ from marxtest.utils import colname_case as cc
 from marxtest.process_utils import (marxpars_from_asol,
                                     spectrum_from_fluxcorrection)
 
-tests = ['ACISSPSF', 'ACISIPSF', 'HRCIPSF', 'OffAxisPSF']
+tests = ['ACISSPSF', 'ACISIPSF', 'HRCIPSF', 'OffAxisPSF', 'CompareMARXSAOTrace']
 
 title = 'Point Spread Function (PSF)'
+
+
+def plot_ecf(ax, files, filterargs):
+    '''
+    Parameters
+    ----------
+    ax : matplotlib axes
+        Axes where the plot will be placed
+    file : list
+        List of three strings with filename for observations,
+        Marx simulation, and SAOTRace + marx simulation
+    filterargs : dict
+        See ``filter_events`` for details
+
+    Returns
+    -------
+    err_marx : float
+        Flux error if the MARX simulated PSF is assumed to be right.
+        This is calculated as follows: We find the radius that encircles 90% of
+        all counts in the MARX simulation. Then, we extract the observed counts
+        using that radius. If the simulation is correct, that radius should
+        contain 90% of the observed counts, too. If, e.g. the simulated radius
+        is too small, we may extract only 80 % of the counts. The ratio between
+        the two would be 8/9=0.88, meaning that all fluxes extracted using
+        this radius are 12 % too small.
+    err_sao: float
+        Same for the simulation that used SA)Trace + MARX.
+    '''
+    # In this energy range we have the most counts and we limited
+    # the simulations to the same range.
+    obs = filter_events(Table.read(files[0]), **filterargs)
+    r = radial_distribution(obs['x'], obs['y'])
+    val, edges = np.histogram(r, range=[0, 5], bins=25)
+    bin_mid_obs = 0.5 * (edges[:-1] + edges[1:])
+    ecf_obs = 1.0 * val.cumsum() / val.sum()
+    ax.semilogx(bin_mid_obs, ecf_obs, 'k', lw=3, label='Observation')
+
+    simmarx = filter_events(Table.read(files[1]), **filterargs)
+    r = radial_distribution(simmarx['X'], simmarx['Y'])
+    val, edges = np.histogram(r, range=[0, 5], bins=25)
+    bin_mid_marx = 0.5 * (edges[:-1] + edges[1:])
+    ecf_marx = 1.0 * val.cumsum() / val.sum()
+    ax.semilogx(bin_mid_marx, ecf_marx, 'r', lw=3, label='MARX')
+
+    simmarx = filter_events(Table.read(files[2]), **filterargs)
+    r = radial_distribution(simmarx['X'], simmarx['Y'])
+    val, edges = np.histogram(r, range=[0, 5], bins=25)
+    bin_mid_sao = 0.5 * (edges[:-1] + edges[1:])
+    ecf_sao = 1.0 * val.cumsum() / val.sum()
+    ax.semilogx(bin_mid_sao, ecf_sao, 'b', lw=3, label='SAOTrace + MARX')
+
+    ax.set_xlabel('radius [pixel]')
+    ax.set_ylabel('enclosed count fraction')
+    ax.legend(loc='upper left')
+    ax.set_xlim([0.1, 5])
+    ax.grid()
+
+    psf90_marx = np.interp(ecf_marx, bin_mid_marx, 0.9)
+    ecf_at_that_rad = np.interp(bin_mid_obs, ecf_obs, psf90_marx)
+    err_marx = ecf_at_that_rad / 0.9 - 1
+
+    psf90_sao = np.interp(ecf_marx, bin_mid_sao, 0.9)
+    ecf_at_that_rad = np.interp(bin_mid_obs, ecf_obs, psf90_sao)
+    err_sao = ecf_at_that_rad / 0.9 - 1
+
+    return err_marx, err_sao
 
 
 def filter_events(evt, circle=None, energy=None, time=None):
@@ -112,6 +178,13 @@ class HRCIPSF(base.MarxTest):
     x,y,r are given in "physical" pixel units on the detector.
     '''
 
+    expresults = [{'name': 'marx90', 'title': 'Flux err (MARX)',
+                   'description': 'Flux error if the MARX simulated PSF is assumed to be right. This is calculated as follows: We find the radius that encircles 90% of all counts in the MARX simulation. Then, we extract the observed counts using that radius. If the simulation is correct, that radius should contain 90% of the observed counts, too. If, e.g. the simulated radius is too small, we may extract only 80 % of the counts. The ratio between the two would be 8/9=0.88, meaning that all fluxes extracted using this radius are 12 % too small.',
+                   'value': 0},
+                  {'name': 'saotrace90', 'title': 'Flux err (SAOTrace+MARX)',
+                   'description': 'Same, but using a model of SAOTrace + MARX',
+                   'value': 1}]
+
     @property
     def source_reg(self):
         return "circle({0}, {1}, {2})".format(self.source['x'],
@@ -151,7 +224,7 @@ class HRCIPSF(base.MarxTest):
 
     @base.Marx2fits
     def step_2(self):
-        '''No EDSER is available for GRC data'''
+        '''No EDSER is available for HRC data'''
         return ('--pixadj=NONE', 'marx_only', 'marx_only.fits')
 
     @base.SAOTraceLua
@@ -228,50 +301,15 @@ point{{ position = {{ ra = {ra},
         evt2file = self.get_data_file('evt2')
         files = [evt2file, 'marx_only.fits', 'marx_saotrace.fits']
 
-        fig = plt.figure(figsize=(10,5))
+        fig = plt.figure(figsize=(10, 5))
         ax = fig.add_subplot(111)
-        title = [evt2file, 'marx_only.fits', 'marx_saotrace.fits']
 
-        # In this energy range we have the most counts and we limited
-        # the simulations to the same range.
-        obs = filter_events(Table.read(files[0]), **filterargs)
-        r = radial_distribution(obs['x'], obs['y'])
-        val, edges = np.histogram(r, range=[0, 5], bins=25)
-        ax.semilogx(0.1 + edges[:-1], 1.0 * val.cumsum() / val.sum(), 'k', lw=3, label='Observation')
-
-        simmarx = filter_events(Table.read(files[1]), **filterargs)
-        r = radial_distribution(simmarx['X'], simmarx['Y'])
-        val, edges = np.histogram(r, range=[0, 5], bins=25)
-        ax.semilogx(0.1 + edges[:-1], 1.0 * val.cumsum() / val.sum(), 'r', lw=3, label='MARX')
-
-        simmarx = filter_events(Table.read(files[2]), **filterargs)
-        r = radial_distribution(simmarx['X'], simmarx['Y'])
-        val, edges = np.histogram(r, range=[0, 10], bins=50)
-        ax.semilogx(0.1 + edges[:-1], 1.0 * val.cumsum() / val.sum(), 'b', lw=3, label='SAOTrace + MARX')
-
-        ax.set_xlabel('radius [pixel]')
-        ax.set_ylabel('enclosed count fraction')
-        ax.legend(loc='upper left')
-        ax.set_xlim([0.1, 5])
-        ax.grid()
+        err_marx, err_sao = plot_ecf(ax, files, filterargs)
 
         fig.savefig(self.figpath(self.figures.keys()[0]))
 
-    # @base.Python
-    # def step_100(self):
-    #     '''Compare obs and sim data
-
-    #     The most important question to ask here is:
-    #     What is the error that I make when I assume the MARX PSF is correct?
-
-    #     In this function, we try to summarize this question in a few numbers.
-    #     '''
-    #     with open(os.path.join(self.basepath, 'sherpaout.json')) as f:
-    #         sherpaout = json.load(f)
-
-    #     self.save_test_result('chi2marx', sherpaout['chi2marx'])
-    #     self.save_test_result('chi2default', sherpaout['chi2default'])
-    #     self.save_test_result('arfdiff', sherpaout['arfdiff'])
+        self.save_test_result('marx90', err_marx)
+        self.save_test_result('saotrace90', err_sao)
 
 
 class ACISSPSF(HRCIPSF):
@@ -355,7 +393,7 @@ class ACISSPSF(HRCIPSF):
 
         evt2file = self.get_data_file('evt2')
 
-        fig = plt.figure(figsize=(10,5))
+        fig = plt.figure(figsize=(10, 5))
         ax1 = fig.add_subplot(121)
         ax2 = fig.add_subplot(122)
 
@@ -363,30 +401,13 @@ class ACISSPSF(HRCIPSF):
                                     [[evt2file, 'marx_only.fits', 'marx_saotrace.fits'],
                                      ['obs_rand.fits', 'marx_only_rand.fits', 'marx_saotrace_rand.fits']],
                                     ['EDSER', 'RANDOMIZE']):
-
-            # In this energy range we have the most counts and we limited
-            # the simulations to the same range.
-            obs = filter_events(Table.read(files[0]), **filterargs)
-            r = radial_distribution(obs['x'], obs['y'])
-            val, edges = np.histogram(r, range=[0, 5], bins=25)
-            ax.semilogx(0.1 + edges[:-1], 1.0 * val.cumsum() / val.sum(), 'k', lw=3, label='Observation')
-
-            simmarx = filter_events(Table.read(files[1]), **filterargs)
-            r = radial_distribution(simmarx['X'], simmarx['Y'])
-            val, edges = np.histogram(r, range=[0, 5], bins=25)
-            ax.semilogx(0.1 + edges[:-1], 1.0 * val.cumsum() / val.sum(), 'r', lw=3, label='MARX')
-
-            simmarx = filter_events(Table.read(files[2]), **filterargs)
-            r = radial_distribution(simmarx['X'], simmarx['Y'])
-            val, edges = np.histogram(r, range=[0, 5], bins=25)
-            ax.semilogx(0.1 + edges[:-1], 1.0 * val.cumsum() / val.sum(), 'b', lw=3, label='SAOTrace + MARX')
+            err_marx, err_sao = plot_ecf(ax, files, filterargs)
 
             ax.set_title(title)
-            ax.set_xlabel('radius [pixel]')
-            ax.set_ylabel('enclosed count fraction')
-            ax.legend(loc='lower right')
-            ax.set_xlim([0.1, 5])
-            ax.grid()
+
+            if title == 'EDSER':
+                self.save_test_result('marx90', err_marx)
+                self.save_test_result('saotrace90', err_sao)
 
         fig.savefig(self.figpath(self.figures.keys()[0]))
 
@@ -460,4 +481,206 @@ simplification that the |marx| mirror model makes.'''
     @base.Ciao
     def step_20(self):
         '''ds9 images of the PSF'''
-        return ['''ds9 -width 800 -height 500 -log -cmap heat {0} marx_only.fits marx_saotrace.fits -pan to 5256 6890 physical -bin about 5256 6890 -match frame wcs -match bin -frame 1 -regions command 'text 5:39:27.987 -69:43:52.31 # text=Observation font="helvetica 24"' -frame 2 -regions command 'text 5:39:27.987 -69:43:52.31 # text="only MARX" font="helvetica 24"' -frame 3 -regions command 'text 5:39:27.987 -69:43:52.31 # text=SAOTrace font="helvetica 24"' -saveimage {1} -exit'''.format(self.get_data_file('evt2'), self.figpath(self.figures.keys()[0]))]
+        return ['''ds9 -width 800 -height 500 -log -cmap heat {0} marx_only.fits marx_saotrace.fits -pan to 5256 6890 physical -bin about 5256 6890 -match frame wcs -match bin -frame 1 -regions command 'text 5:39:27.987 -69:43:52.31 # text=Observation font="helvetica 24"' -frame 2 -regions command 'text 5:39:27.987 -69:43:52.31 # text="only MARX" font="helvetica 24"' -frame 3 -regions command 'text 5:39:27.987 -69:43:52.31 # text=SAOTrace font="helvetica 24"' -regions command 'text 5:39:26.691 -69:44:09.93 # text="+ MARX" font="helvetica 24"' -saveimage {1} -exit'''.format(self.get_data_file('evt2'), self.figpath(self.figures.keys()[0]))]
+
+
+class CompareMARXSAOTrace(base.MarxTest):
+    '''The gold standard to test the fidelity of |marx| and `SAOTrace`_
+    obviously is to compare simulations to observations.
+    However, it is also instructive to look at a few idealized cases with no
+    observational counterpart so we can simulate high fidelity PSFs with a large
+    number of counts without worrying about background or pile-up.
+    The `Chandra Proposers Observatory Guide <http://cxc.harvard.edu/proposer/POG/html/chap4.html#tth_sEc4.2.3>`_
+    contains a long section on the PSF and encircled energy based on `SAOTrace`_
+    simulations. Some of those simulations are repeated here to compare them
+    to pure |marx| simulations:
+
+    - Delta function spectra with different energy to cleanly show how the PSF changes with energy.
+    - Spectra with different absorbed powerlaws to show how the PSF might differ in practice.
+    - PSFs at different off-axis angles.
+    '''
+
+    title = 'Compare |marx| and `SAOTrace`_ simulations of the PSF'
+
+    summary = "TBD"
+
+    figures = OrderedDict([('PSFimages', {'alternative': 'Gallery of PSf images. See caption for a desription.',
+                                          'caption': 'PSF images for different discrete energies for pure |marx| and `SAOTrace`_ + |marx| simulations. The color scale is linear, but the absolute scaling is different for different images, because the effective area and thus the number of detected photons is lower at higher energies. Contour lines mark flux levels at 30%, 60%, and 90% of the peak flux level. At higher energies, the PSF becomes asymmetric, because mirror pair 6, which is most important at high energies is slightly tilted with respect to the nominal aimpoint. At the same time, the scatter, and thus the size of the PSF increase at higher energies. This is seen in both types of simulations.'}),
+                           ('ECF', {'alternative': 'The |marx| PSF is generally narrower than the  `SAOTrace`_ + |marx| PSF. The agreement is best for energies around 2-4 keV.',
+                                    'caption': 'Encircled count fraction for the same simulations as above. **solid line**: |marx| only, **dotted lines**: `SAOTrace`_ + |marx|. For each photon, the radial distance is calculated from the nominal source position. Because the center is offset for hard photons, the PSF appears wide at those energies.'})])
+
+    energies = [0.25, 0.5, 1, 2, 3, 4, 6, 8]
+
+    def __init__(self, *args):
+        super(CompareMARXSAOTrace, self).__init__(*args)
+        self.marxnames = ['marx{0}'.format(e) for e in self.energies]
+        self.saonames = ['sao{0}'.format(e) for e in self.energies]
+
+    @base.Ciao
+    def step_1(self):
+        '''Set up default marx.par file'''
+        com = ['cp {0} marx.par'.format(self.conf.get('marx', 'marxparfile'))]
+        for s in ['GratingType=NONE', 'DetectorType=HRC-I',
+                  'DitherModel=INTERNAL',
+                  'ExposureTime=10000', 'SourceFlux=0.2',
+                  'SourceRA=0.', 'SourceDEC=0.',
+                  'RA_Nom=0.', 'Dec_Nom=0.', 'Roll_Nom=0.']:
+            com.append('pset marx.par {0}'.format(s))
+        return com
+
+    @base.Marx
+    def step_2(self):
+        '''run marx for different energies'''
+        marxpars = []
+        for e, n in zip(self.energies, self.marxnames):
+            marxpars.append({'MinEnergy': e, 'MaxEnergy': e, 'OutputDir': n})
+        return marxpars
+
+    @base.Marxasp
+    def step_3(self):
+        '''Generate asol file
+
+        Since all simulations use the same pointing and exposure time, it is
+        enough to run :marxtool:`marxasp` once.
+        '''
+        return {'MarxDir': self.marxnames[0]}
+
+    @base.Marx2fits
+    def step_4(self):
+        '''Fits files from |marx| runs'''
+        options = ['--pixadj=NONE'] * len(self.energies)
+        fitsnames = [n + '.fits' for n in self.marxnames]
+        return options, self.marxnames, fitsnames
+
+    @base.SAOTrace
+    def step_10(self):
+        '''Repeat MARX simulations from above'''
+        asolh = fits.getheader('marx_asol1.fits', 1)
+
+        limit = asolh['TSTOP'] - asolh['TSTART']
+        limit = limit - 0.02
+        com = []
+        for t, e in zip(self.saonames, self.energies):
+            # The following line has a ' in a " delimited string which itself
+            # is placed inside a ' delimited string like this: '"\'aaa\'"'
+            com.append('trace-nest tag={tag} srcpars="point{{ position = {{ ra = 0., dec = 0., ra_aimpt=0., dec_aimpt=0. }}, spectrum = {{ {{ {energy}, 0.2 }} }} }} roll(0) dither_asol_marx{{ file = \'marx_asol1.fits\', ra = 0., dec = 0., roll = 0. }}" tstart={tstart}  limit={limit} limit_type=sec'.format(tag=t, tstart=asolh['TSTART'] + 0.01, energy=e, limit=limit))
+
+        return com
+
+    @base.Marx
+    def step_11(self):
+        '''run marx for all SAOTrace runs'''
+        marxpars = []
+        for s, n in zip(self.saonames, self.marxnames):
+            marxpars.append({'SourceType': 'SAOSAC', 'SAOSACFile': s + '.fits',
+                             'OutputDir': 'sao' + n,
+                             'DitherModel':'FILE',
+                             'DitherFile': 'marx_asol1.fits'})
+        return marxpars
+
+    @base.Marx2fits
+    def step_12(self):
+        '''Fits files from |marx| + `SAOTrace`_ runs'''
+        options = ['--pixadj=NONE'] * len(self.energies)
+        dirnames = ['sao' + n for n in self.marxnames]
+        fitsnames = ['sao' + n + '.fits' for n in self.marxnames]
+        return options, dirnames, fitsnames
+
+    @base.Python
+    def step_20(self):
+        '''Image gallery of PSFs'''
+        from matplotlib import pyplot as plt
+        from mpl_toolkits.axes_grid1 import AxesGrid
+        from matplotlib.ticker import StrMethodFormatter
+
+        fig = plt.figure(figsize=(10, 4))
+
+        grid = AxesGrid(fig, 111,  # similar to subplot(142)
+                        nrows_ncols=(2, len(self.energies)),
+                        axes_pad=0.0,
+                        share_all=True,
+                        label_mode="L",
+                        cbar_location="top",
+                        cbar_mode="single")
+
+        for i, e in enumerate(self.energies):
+
+            for prog in ['marx', 'saomarx']:
+                tab = Table.read('{0}{1}.fits'.format(prog, e), hdu=1)
+                # The old question: Is an index the center of a pixel of the corner?
+                # Differs by 0.5...
+                d_ra = (tab['X'] - tab.meta['TCRPX9'] - 0.5) * tab.meta['TCDLT9'] * 3600.
+                # And do I count fro mthe left or right (RA is reversed on the sky)?
+                d_dec = (tab['Y'] - tab.meta['TCRPX10'] + 0.5) * tab.meta['TCDLT10'] * 3600.
+
+                if prog == 'marx':
+                    offset = 0
+                else:
+                    offset = len(self.energies)
+                im = grid[i + offset].hist2d(d_ra, d_dec,
+                                             range=[[-1, 1], [-1, 1]],
+                                             bins=[20, 20],
+                                             cmap=plt.get_cmap('OrRd'))
+                levels = np.max(im[0]) * np.array([0.3, 0.6, 0.9])
+                grid[i + offset].contour(0.5 * (im[1][1:] + im[1][:-1]),
+                                         0.5 * (im[2][1:] + im[2][:-1]),
+                                         # for some reason, the data is
+                                         # ordered for other orientation
+                                         im[0].T, levels=levels, colors='k',
+                                         origin = im[3].origin)
+                grid[i + offset].grid()
+                if prog == 'marx':
+                    grid[i].text(-1, 1., '{0} keV'.format(e))
+                else:
+                    grid[i].xaxis.set_major_formatter(StrMethodFormatter('{x:2.1g}'))
+
+        grid[0].yaxis.set_major_formatter(StrMethodFormatter('{x:2.1g}'))
+        grid[len(self.energies)].yaxis.set_major_formatter(StrMethodFormatter('{x:2.1g}'))
+        grid.cbar_axes[0].colorbar(im[3])
+        for cax in grid.cbar_axes:
+            cax.toggle_label(False)
+
+        # This affects all axes as share_all = True.
+        grid.axes_llc.set_xticks([-.5, 0, .5])
+        grid.axes_llc.set_yticks([-.5, 0, .5])
+
+        grid[0].set_ylabel('Marx')
+        grid[offset].set_ylabel('Marx +\nSAOTrace')
+        grid[int(1.5 * offset)].set_xlabel('arcsec (measured from nominal source position)')
+
+        fig.subplots_adjust(top=1, bottom=0, left=0.1, right=0.99)
+        fig.savefig(self.figpath(self.figures.keys()[0]))
+
+    @base.Python
+    def step_21(self):
+        '''Plots of radial distribution'''
+        from matplotlib import pyplot as plt
+
+        fig = plt.figure()
+        axecf = fig.add_subplot(111)
+        color = plt.cm.jet(np.linspace(0, 1, len(self.energies)))
+        for i, e in enumerate(self.energies):
+
+            for prog in ['marx', 'saomarx']:
+                tab = Table.read('{0}{1}.fits'.format(prog, e), hdu=1)
+                # The old question: Is an index the center of a pixel of the corner?
+                # Differs by 0.5...
+                d_ra = (tab['X'] - tab.meta['TCRPX9'] - 0.5) * tab.meta['TCDLT9'] * 3600.
+                # Count from the left or right (RA is reversed on the sky)?
+                d_dec = (tab['Y'] - tab.meta['TCRPX10'] + 0.5) * tab.meta['TCDLT10'] * 3600.
+
+                # The simulation is set up to make this simple: RA=DEC=0
+                # so cos(DEC) = 1 and we can approximate with Euklidian distance
+                r = np.linalg.norm(np.vstack([d_ra, d_dec]), axis=0)
+                val, edges = np.histogram(r, range=[0, 5], bins=50)
+                bin_mid_marx = 0.5 * (edges[:-1] + edges[1:])
+                ecf_marx = 1.0 * val.cumsum() / val.sum()
+                if prog == 'marx':
+                    axecf.plot(bin_mid_marx, ecf_marx, color=color[i], lw=2, label='{0} keV'.format(e))
+                else:
+                    axecf.plot(bin_mid_marx, ecf_marx, color=color[i], lw=2, ls=':')
+        axecf.legend(loc='lower right')
+        axecf.set_ylabel('encircled count fraction')
+        axecf.set_xlabel('radius [arcsec]')
+        axecf.grid()
+        fig.savefig(self.figpath('ECF'))
