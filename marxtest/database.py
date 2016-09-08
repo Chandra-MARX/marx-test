@@ -33,7 +33,11 @@ def setup(f):
             set_configdict(conf)
 
         if con is None:
-            con = sqlite3.connect(conf.get('Output', 'sqlitedb'))
+            dbfile = conf.get('Output', 'sqlitedb')
+            if not os.path.exists(os.path.dirname(dbfile)):
+                os.makedirs(os.path.dirname(dbfile))
+
+            con = sqlite3.connect(dbfile)
             con.row_factory = sqlite3.Row
 
             con.execute("CREATE TABLE IF NOT EXISTS config (marx STRING, ciao STRING, caldb string,  saotrace STRING, compiler STRING, compilerversion STRING, compilerflags STRING, host STRING);")
