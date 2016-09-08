@@ -18,13 +18,22 @@ class ExternalBaseWrapper(object):
 
     The wrapped function will have two important methods: ``__call__``
     and ``source``, which returns the source as run in a test.
-    In the simplest case, the function might dynamically insert a filename
-    and path into a string template. For display purposes, we do not want
-    to see that template, but the complete commands run as part of a test,
+    For example, the function might dynamically insert a filename
+    and path into a string template to generate a set of `CIAO`_ commands.
+    For display purposes, we do not want to see that template,
+    but the complete commands run as part of a test,
     e.g. the CIAO commands to extract a spectrum.
+
+    The `ExternalBaseWrapper` is the base class to define such wrappers.
     '''
+
     interpreter = 'undefined'
+    '''Used to display the source of the wrapped function with a specific
+    syntax highlighting.
+    '''
+
     program = 'unknown'
+    '''Used to generate header in the source listing page.'''
 
     def __init__(self, f):
         self.f = f
@@ -72,7 +81,7 @@ class ExternalBaseWrapper(object):
         self.f(obj)
 
     def __get__(self, instance, cls=None):
-        ''' This implements the descriptor protocol and allows this
+        '''This implements the descriptor protocol and allows this
         callable class to be used as a bound method.
         See https://docs.python.org/2/howto/descriptor.html#functions-and-methods
         '''
@@ -131,11 +140,11 @@ class Sherpa(ExternalBaseWrapper):
 
 
 class Ciao(ExternalBaseWrapper):
-    '''Wrap functions that generate CIAO shell commands.
+    '''Wrap functions that generate `CIAO`_ shell commands.
 
     The output format of the wrapped function is a list of strings.
 
-    On display with ``source`` absolute path in the CIAO commands will be
+    On display with ``source()`` absolute path in the CIAO commands will be
     replaced with relative path, which are typically shorter in print.
     '''
     interpreter = "shell"
@@ -160,7 +169,7 @@ class Marx(ExternalBaseWrapper):
     - or a list of such dictionaries to run a batch of marx simulations.
 
     All parameters that are not set in this dictionary stay
-    at the default set in marx.par in the marx installation.
+    at the default set in ``marx.par``.
 
     Unless there is a ``marx.par`` file in the current directory, marx is
     called with the file defined in the configuration file.
@@ -197,10 +206,33 @@ class Marx(ExternalBaseWrapper):
 
 
 class Marxasp(Marx):
+    '''Wrap a function that generates :marxtool:`marxasp` input parameters.
+
+    The output format of the wrapped function is either
+
+    - a dictionary of :marxtool:`marxasp` parameters.
+    - or a list of such dictionaries to run a batch of :marxtool:`marxasp` commands.
+
+    All parameters that are not set in this dictionary stay
+    at the default set in ``marxasp.par``.
+
+    Unless there is a ``marxasp.par`` file in the current directory, marx is
+    called with the file defined in the configuration file.
+    '''
     program = 'marxasp'
 
 
 class Marx2fits(ExternalBaseWrapper):
+    '''Wrap a function that generates :marxtool:`marx2fits` input parameters.
+
+    The output format of the wrapped function is either
+
+    - a tuple of 3 strings, which set (in this order) the parameter (e.g.
+      ``--pixadj=EDSER``), the marx directory and the output file name.
+      See :marxtool:`marx2fits` for details.
+    - a tuple of three arrays, where each array is a list of strings. In this case
+      a batch of :marxtool:`marx2fits` commands is generated.
+    '''
     interpreter = "shell"
     program = 'marx2fits'
 
@@ -230,6 +262,11 @@ class Marx2fits(ExternalBaseWrapper):
 
 
 class SAOTraceLua(ExternalBaseWrapper):
+    '''Wrap a function that writes a lua input file for `SAOTrace`_.
+
+    The ourput of that function is just a string. This string is written to a file
+    called ``saotrace_source.lua`` in the appropriate directory.
+    '''
     interpreter = "lua"
     program = "Lua input for SAOTrace"
 
@@ -243,12 +280,56 @@ class SAOTraceLua(ExternalBaseWrapper):
 
 
 class SAOTrace(Ciao):
+    '''Wrap a function that return shall commands to run `SAOTrace`_.
+
+    The output format of the wrapped function is a list of strings. This
+    wrapper will set up the appropriate shell envisonment to run the
+    commands.
+    '''
     interpreter = "shell"
     program = "SAOTrace"
 
 
 class MarxTest(object):
-    '''
+    '''Base class to specify a |marx| test.
+
+    Each test for |marx| is written as class that is derived from this
+    class. In this way, the core functionality to execute a test can be
+    provided by this base class, but it can be extended or overwritten
+    with no limits by writing arbitrary python code.
+
+    The basic requirements for a |marx| test are:
+
+    - Set up a test by making a directory structure to save temporary and
+      final products, download Chandra data from the archive that can
+      be compared to simulations etc.
+
+    - Run a one or more pieces of code to execute a full test. This
+      can include, but is not limited to:
+
+      - Python code
+      - Shell code (bash by default)
+      - `CIAO`_ commands (executed in a bash shell)
+      - `Sherpa`_ code (executed in a subshell, because it
+        requires its own setup independent from the system python)
+      - `SAOTrace`_ commands (executed in a bash shell)
+      - |marx| or any of its tools like :marxtool:`marx2fits`.
+
+      Individual shell sessions need to be independent, because they require
+      different and sometimes mutally exclusive setup commands.
+
+    - While running, produce output that indicates the result of a test, e.g.
+      figures or numbers.
+
+    - Document how the test is run for accountability and to serve as
+      example for users.
+
+    This base class provides hooks to fill all these requirements, some are
+    implemented here, some need to the specified in the subclasses in one of
+    two ways:
+
+    - Class attributes. Derived classes can overwrite these attributes, see
+      the docstring of eahc attribute for details. For example,
 
     Parameters
     ----------
@@ -257,13 +338,31 @@ class MarxTest(object):
     '''
 
     obsid = None
+    '''Set to a Chandra ObsID in a derived class'''
 
     download_all = False
     '''Set to ``True`` to download all files in the Chandra archive.
     If ``False`` files will be downloaded one by one when they are needed.
     '''
 
+    title = ''
+    '''String for display of these test in rendered docs.
+
+    Should not be longer than a few words.'''
+
     figures = OrderedDict()
+    '''Speficfy any figures that this test generates.
+
+    The format is an `~collection.OrderedDict` where the keys are the
+    file names of the figures (no file extension - the code performs some
+    name mangling adding the name of the class to avoid name conflicts on
+    top of the given name) and the values are again dictionaries with entries
+    that set the rst figure properties (e.g. caption). An simple example is:
+    ``figures = OrderedDict([('fig1', {'caption': 'Figure caption 1})])``.
+    '''
+
+    summary = ''
+    '''String to display in the rendered docs to summarize the test result.'''
 
     version = 1
     '''If the definition of a test changes so that results cannot be
@@ -272,6 +371,14 @@ class MarxTest(object):
     '''
 
     expresults = []
+    '''Expected test results that will be stored in the test database.
+
+    The format is a list, where each element of the list is a dictionary
+    with keys for the results database, e.g.
+    ``expresults = [{'name': 't1', 'title': 'max 20 characters', 'description': 'text', 'value': 1}]``.
+    See the description of the database for a complete list of fields and
+    their meaning.
+    '''
 
     def __init__(self, conf):
         self.conf = conf
@@ -295,6 +402,7 @@ class MarxTest(object):
 
     @property
     def datapath(self):
+        '''Path to downloaded Chandra data.'''
         return os.path.join(self.basepath, 'download')
 
     def figpath(self, name):
@@ -324,11 +432,14 @@ class MarxTest(object):
 
     @property
     def steplist(self):
+        '''Get a sorted list of methods called ``step_*``.
+        '''
         steplist = [method for method in dir(self) if (method[:5] == 'step_')]
         steplist.sort(key=lambda s: int(s.split('_')[1]))
         return [getattr(self, s) for s in steplist]
 
     def run(self):
+        '''Setup test, make output directories and run all steps.'''
         self.pkg_data = os.path.join(self.conf.get('tests', 'path'),
                                      self.conf.get('tests', 'modulename'),
                                      'data')
@@ -375,5 +486,22 @@ class MarxTest(object):
             raise ValueError('Specification not unique. Found {0}'.format(filename))
 
     def save_test_result(self, testname, value, sigma=None, sigma2=None):
+        '''Save a test result to the test database.
+
+        Parameters
+        ----------
+        testname : string
+            Name of this test. Needs to match on of the names in
+            expresults.
+        value : typically a float
+            results of the test
+        sigma : typically a float
+            Uncertainty on ``value`` e.g. for fit results. Can be ``NONE``
+            if there is no uncertainty associated with the test result.
+        sigma2 : typically a float
+            In some cases a single value for ``sigma`` might not be sufficient,
+            e.g. if error up and down a different. In this case, ``sigma2`` hold the
+            second number.
+        '''
         database.insert_test_run(self.conf, self.name, testname, self.version,
                                  value, sigma, sigma2)
