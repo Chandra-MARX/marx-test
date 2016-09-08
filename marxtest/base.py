@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os
 import functools
 import inspect
@@ -145,15 +147,23 @@ class Ciao(ExternalBaseWrapper):
     def __call__(self, obj, conf):
         commands = self.f(obj)
         commands.insert(0, conf.get(self.program, 'setup'))
+        print('\n'.join(commands))
         subprocess.call(['\n'.join(commands)], shell=True, cwd=obj.basepath)
 
 
 class Marx(ExternalBaseWrapper):
     '''Wrap a function that generates MARX input parameters.
 
-    The output format of the wrapped function is a dictionary of MARX
-    parameters. All parameters that are not set in this dictionary stay
+    The output format of the wrapped function is either
+
+    - a dictionary of MARX parameters.
+    - or a list of such dictionaries to run a batch of marx simulations.
+
+    All parameters that are not set in this dictionary stay
     at the default set in marx.par in the marx installation.
+
+    Unless there is a ``marx.par`` file in the current directory, marx is
+    called with the file defined in the configuration file.
     '''
     interpreter = "shell"
     program = 'marx'
@@ -161,19 +171,29 @@ class Marx(ExternalBaseWrapper):
     def source(self):
         '''Assemble string for marx assuming everything is in the path.'''
         par = self.f(self.instance)
-        marxcall = ['{0}={1}'.format(k, v) for k, v in par.iteritems()]
-        marxcall.insert(0, self.program)
+        if isinstance(par, dict):
+            par = [par]
 
-        return ' '.join(marxcall).replace(self.instance.basepath + '/', '')
+        calls = []
+        for p in par:
+            marxcall = ['{0}={1}'.format(k, v) for k, v in p.iteritems()]
+            marxcall.insert(0, self.program)
+            calls.append(' '.join(marxcall).replace(self.instance.basepath + '/', ''))
+        return '\n'.join(calls)
 
     def __call__(self, obj, conf):
         '''Assemble string for marxcall using path information from env.'''
         par = self.f(self.instance)
-        marxcall = ['{0}={1}'.format(k, v) for k, v in par.iteritems()]
-        marxcall.insert(0, os.path.join(conf.get('marx', 'binpath'),
-                                        self.program))
-        marxcall.insert(1, '@@{0}'.format(conf.get('marx', self.program + 'parfile')))
-        subprocess.call([' '.join(marxcall)], shell=True, cwd=obj.basepath)
+        if isinstance(par, dict):
+            par = [par]
+
+        for p in par:
+            marxcall = ['{0}={1}'.format(k, v) for k, v in p.iteritems()]
+            marxcall.insert(0, os.path.join(conf.get('marx', 'binpath'),
+                                            self.program))
+            if not os.path.exists('{0}.par'.format(self.program)):
+                marxcall.insert(1, '@@{0}'.format(conf.get('marx', self.program + 'parfile')))
+            subprocess.call([' '.join(marxcall)], shell=True, cwd=obj.basepath)
 
 
 class Marxasp(Marx):
@@ -184,16 +204,29 @@ class Marx2fits(ExternalBaseWrapper):
     interpreter = "shell"
     program = 'marx2fits'
 
+    def args2list(self, args):
+        out = []
+        for a in args:
+            if isinstance(a, list):
+                out.append(a)
+            else:
+                out.append([a])
+        return out
+
     def source(self):
         '''Assemble string for marx2fits call assuming PATH is set.'''
-        options, marxdir, outfile = self.f(self.instance)
-        return ' '.join([self.program, options, marxdir, outfile]).replace(self.instance.basepath + '/', '')
+        options, marxdir, outfile = self.args2list(self.f(self.instance))
+        source = []
+        for op, md, out in zip(options, marxdir, outfile):
+            source.append(' '.join([self.program, op, md, out]).replace(self.instance.basepath + '/', ''))
+        return '\n'.join(source)
 
     def __call__(self, obj, conf):
-        options, marxdir, outfile = self.f(self.instance)
-        marx2fitscall = ' '.join([os.path.join(conf.get('marx', 'binpath'), self.program),
-                                  options, marxdir, outfile])
-        subprocess.call([marx2fitscall], shell=True, cwd=obj.basepath)
+        options, marxdir, outfile = self.args2list(self.f(self.instance))
+        exefile = os.path.join(conf.get('marx', 'binpath'), self.program)
+        for op, md, out in zip(options, marxdir, outfile):
+            marx2fitscall = ' '.join([exefile, op, md, out])
+            subprocess.call([marx2fitscall], shell=True, cwd=obj.basepath)
 
 
 class SAOTraceLua(ExternalBaseWrapper):
