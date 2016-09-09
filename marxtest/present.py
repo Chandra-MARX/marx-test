@@ -5,8 +5,6 @@ import os
 import sys
 import jinja2
 
-from .utils import ChangeDir
-
 
 __all__ = ['write_summary_rst', 'run_and_output']
 
@@ -122,8 +120,7 @@ def run_and_output(conffile, run=True, modules=None, tests=None):
                 testinst.run()
             t_list.append(testinst)
             with open(pjoin(outpath, 'code', t + '.rst'), 'w') as f:
-                with ChangeDir(testinst.basepath):
-                    f.write(codetemp.render(testinst=testinst))
+                f.write(codetemp.render(testinst=testinst))
         with open(pjoin(outpath, module + '.rst'), 'w') as f:
             f.write(testlisttemp.render(module=imp_module,
                                         testinstances=t_list,
