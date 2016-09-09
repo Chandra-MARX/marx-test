@@ -3,6 +3,8 @@ The `point-spread function (PSF) for Chandra <http://cxc.harvard.edu/ciao/PSFs/p
 
 The following tests compare |marx| simulations, `SAOTrace`_ simulations, and data to look at different aspects of the Chandra PSF.
 '''
+from __future__ import division
+
 import os
 import shutil
 import numpy as np
@@ -17,7 +19,8 @@ from marxtest.utils import colname_case as cc
 from marxtest.process_utils import (marxpars_from_asol,
                                     spectrum_from_fluxcorrection)
 
-tests = ['ACISSPSF', 'ACISIPSF', 'HRCIPSF', 'OffAxisPSF', 'CompareMARXSAOTrace']
+tests = ['ACISSPSF', 'ACISIPSF', 'HRCIPSF', 'OffAxisPSF',
+         'CompMARXSAOTraceenergies', 'CompMARXSAOTraceoffaxis']
 
 title = 'Point Spread Function (PSF)'
 
@@ -77,12 +80,12 @@ def plot_ecf(ax, files, filterargs):
     ax.set_xlim([0.1, 5])
     ax.grid()
 
-    psf90_marx = np.interp(ecf_marx, bin_mid_marx, 0.9)
-    ecf_at_that_rad = np.interp(bin_mid_obs, ecf_obs, psf90_marx)
+    psf90_marx = np.interp(0.9, ecf_marx, bin_mid_marx)
+    ecf_at_that_rad = np.interp(psf90_marx, bin_mid_obs, ecf_obs)
     err_marx = ecf_at_that_rad / 0.9 - 1
 
-    psf90_sao = np.interp(ecf_marx, bin_mid_sao, 0.9)
-    ecf_at_that_rad = np.interp(bin_mid_obs, ecf_obs, psf90_sao)
+    psf90_sao = np.interp(0.9, ecf_marx, bin_mid_sao)
+    ecf_at_that_rad = np.interp(psf90_sao, bin_mid_obs, ecf_obs)
     err_sao = ecf_at_that_rad / 0.9 - 1
 
     return err_marx, err_sao
@@ -181,7 +184,7 @@ class HRCIPSF(base.MarxTest):
     expresults = [{'name': 'marx90', 'title': 'Flux err (MARX)',
                    'description': 'Flux error if the MARX simulated PSF is assumed to be right. This is calculated as follows: We find the radius that encircles 90% of all counts in the MARX simulation. Then, we extract the observed counts using that radius. If the simulation is correct, that radius should contain 90% of the observed counts, too. If, e.g. the simulated radius is too small, we may extract only 80 % of the counts. The ratio between the two would be 8/9=0.88, meaning that all fluxes extracted using this radius are 12 % too small.',
                    'value': 0},
-                  {'name': 'saotrace90', 'title': 'Flux err (SAOTrace+MARX)',
+                  {'name': 'saotrace90', 'title': 'Fluxerr(SAOTr+MARX)',
                    'description': 'Same, but using a model of SAOTrace + MARX',
                    'value': 1}]
 
@@ -321,8 +324,8 @@ class ACISSPSF(HRCIPSF):
     This correction depends on the type pf chip (FI or BI). This test compares
     the simulation of a point source on a BI ACIS-S chip to an observation.
     The observed object is TYC 8241 2652 1, a young star, and was observed in
-    1/8 sub-array mode to reduce pile-up. The pile-up fraction in the data is about
-    5% in the brightest pixel.
+    1/8 sub-array mode to reduce pile-up. The pile-up fraction in the data is
+    about 5% in the brightest pixel.
     '''
 
     title = 'On-axis PSF on an ACIS-BI chip'
@@ -484,12 +487,12 @@ simplification that the |marx| mirror model makes.'''
         return ['''ds9 -width 800 -height 500 -log -cmap heat {0} marx_only.fits marx_saotrace.fits -pan to 5256 6890 physical -bin about 5256 6890 -match frame wcs -match bin -frame 1 -regions command 'text 5:39:27.987 -69:43:52.31 # text=Observation font="helvetica 24"' -frame 2 -regions command 'text 5:39:27.987 -69:43:52.31 # text="only MARX" font="helvetica 24"' -frame 3 -regions command 'text 5:39:27.987 -69:43:52.31 # text=SAOTrace font="helvetica 24"' -regions command 'text 5:39:26.691 -69:44:09.93 # text="+ MARX" font="helvetica 24"' -saveimage {1} -exit'''.format(self.get_data_file('evt2'), self.figpath(self.figures.keys()[0]))]
 
 
-class CompareMARXSAOTrace(base.MarxTest):
+class CompMARXSAOTraceenergies(base.MarxTest):
     '''The gold standard to test the fidelity of |marx| and `SAOTrace`_
     obviously is to compare simulations to observations.
     However, it is also instructive to look at a few idealized cases with no
-    observational counterpart so we can simulate high fidelity PSFs with a large
-    number of counts without worrying about background or pile-up.
+    observational counterpart so we can simulate high fidelity PSFs with a
+    large number of counts without worrying about background or pile-up.
     The `Chandra Proposers Observatory Guide <http://cxc.harvard.edu/proposer/POG/html/chap4.html#tth_sEc4.2.3>`_
     contains a long section on the PSF and encircled energy based on `SAOTrace`_
     simulations. Some of those simulations are repeated here to compare them
@@ -500,7 +503,7 @@ class CompareMARXSAOTrace(base.MarxTest):
     - PSFs at different off-axis angles.
     '''
 
-    title = 'Compare |marx| and `SAOTrace`_ simulations of the PSF'
+    title = 'On axis PSF at different energies'
 
     summary = "TBD"
 
@@ -509,12 +512,12 @@ class CompareMARXSAOTrace(base.MarxTest):
                            ('ECF', {'alternative': 'The |marx| PSF is generally narrower than the  `SAOTrace`_ + |marx| PSF. The agreement is best for energies around 2-4 keV.',
                                     'caption': 'Encircled count fraction for the same simulations as above. **solid line**: |marx| only, **dotted lines**: `SAOTrace`_ + |marx|. For each photon, the radial distance is calculated from the nominal source position. Because the center is offset for hard photons, the PSF appears wide at those energies.'})])
 
-    energies = [0.25, 0.5, 1, 2, 3, 4, 6, 8]
+    parameter = [0.25, 0.5, 1, 2, 3, 4, 6, 8]
 
     def __init__(self, *args):
-        super(CompareMARXSAOTrace, self).__init__(*args)
-        self.marxnames = ['marx{0}'.format(e) for e in self.energies]
-        self.saonames = ['sao{0}'.format(e) for e in self.energies]
+        super(CompMARXSAOTraceenergies, self).__init__(*args)
+        self.marxnames = ['marx{0}'.format(e) for e in self.parameter]
+        self.saonames = ['sao{0}'.format(e) for e in self.parameter]
 
     @base.Ciao
     def step_1(self):
@@ -532,7 +535,7 @@ class CompareMARXSAOTrace(base.MarxTest):
     def step_2(self):
         '''run marx for different energies'''
         marxpars = []
-        for e, n in zip(self.energies, self.marxnames):
+        for e, n in zip(self.parameter, self.marxnames):
             marxpars.append({'MinEnergy': e, 'MaxEnergy': e, 'OutputDir': n})
         return marxpars
 
@@ -548,19 +551,20 @@ class CompareMARXSAOTrace(base.MarxTest):
     @base.Marx2fits
     def step_4(self):
         '''Fits files from |marx| runs'''
-        options = ['--pixadj=NONE'] * len(self.energies)
+        options = ['--pixadj=NONE'] * len(self.parameter)
         fitsnames = [n + '.fits' for n in self.marxnames]
         return options, self.marxnames, fitsnames
 
     @base.SAOTrace
     def step_10(self):
-        '''Repeat MARX simulations from above'''
-        asolh = fits.getheader('marx_asol1.fits', 1)
+        '''Now use `SAOTrace`_'''
+        asolh = fits.getheader(os.path.join(self.basepath,
+                                            'marx_asol1.fits'), 1)
 
         limit = asolh['TSTOP'] - asolh['TSTART']
         limit = limit - 0.02
         com = []
-        for t, e in zip(self.saonames, self.energies):
+        for t, e in zip(self.saonames, self.parameter):
             # The following line has a ' in a " delimited string which itself
             # is placed inside a ' delimited string like this: '"\'aaa\'"'
             com.append('trace-nest tag={tag} srcpars="point{{ position = {{ ra = 0., dec = 0., ra_aimpt=0., dec_aimpt=0. }}, spectrum = {{ {{ {energy}, 0.2 }} }} }} roll(0) dither_asol_marx{{ file = \'marx_asol1.fits\', ra = 0., dec = 0., roll = 0. }}" tstart={tstart}  limit={limit} limit_type=sec'.format(tag=t, tstart=asolh['TSTART'] + 0.01, energy=e, limit=limit))
@@ -581,7 +585,7 @@ class CompareMARXSAOTrace(base.MarxTest):
     @base.Marx2fits
     def step_12(self):
         '''Fits files from |marx| + `SAOTrace`_ runs'''
-        options = ['--pixadj=NONE'] * len(self.energies)
+        options = ['--pixadj=NONE'] * len(self.parameter)
         dirnames = ['sao' + n for n in self.marxnames]
         fitsnames = ['sao' + n + '.fits' for n in self.marxnames]
         return options, dirnames, fitsnames
@@ -596,17 +600,19 @@ class CompareMARXSAOTrace(base.MarxTest):
         fig = plt.figure(figsize=(10, 4))
 
         grid = AxesGrid(fig, 111,  # similar to subplot(142)
-                        nrows_ncols=(2, len(self.energies)),
+                        nrows_ncols=(2, len(self.parameter)),
                         axes_pad=0.0,
                         share_all=True,
                         label_mode="L",
                         cbar_location="top",
                         cbar_mode="single")
 
-        for i, e in enumerate(self.energies):
+        for i, e in enumerate(self.parameter):
 
             for prog in ['marx', 'saomarx']:
-                tab = Table.read('{0}{1}.fits'.format(prog, e), hdu=1)
+                tab = Table.read(os.path.join(self.basepath,
+                                              '{0}{1}.fits'.format(prog, e)),
+                                 hdu=1)
                 # The old question: Is an index the center of a pixel of the corner?
                 # Differs by 0.5...
                 d_ra = (tab['X'] - tab.meta['TCRPX9'] - 0.5) * tab.meta['TCDLT9'] * 3600.
@@ -616,7 +622,7 @@ class CompareMARXSAOTrace(base.MarxTest):
                 if prog == 'marx':
                     offset = 0
                 else:
-                    offset = len(self.energies)
+                    offset = len(self.parameter)
                 im = grid[i + offset].hist2d(d_ra, d_dec,
                                              range=[[-1, 1], [-1, 1]],
                                              bins=[20, 20],
@@ -635,7 +641,7 @@ class CompareMARXSAOTrace(base.MarxTest):
                     grid[i].xaxis.set_major_formatter(StrMethodFormatter('{x:2.1g}'))
 
         grid[0].yaxis.set_major_formatter(StrMethodFormatter('{x:2.1g}'))
-        grid[len(self.energies)].yaxis.set_major_formatter(StrMethodFormatter('{x:2.1g}'))
+        grid[len(self.parameter)].yaxis.set_major_formatter(StrMethodFormatter('{x:2.1g}'))
         grid.cbar_axes[0].colorbar(im[3])
         for cax in grid.cbar_axes:
             cax.toggle_label(False)
@@ -658,11 +664,13 @@ class CompareMARXSAOTrace(base.MarxTest):
 
         fig = plt.figure()
         axecf = fig.add_subplot(111)
-        color = plt.cm.jet(np.linspace(0, 1, len(self.energies)))
-        for i, e in enumerate(self.energies):
+        color = plt.cm.jet(np.linspace(0, 1, len(self.parameter)))
+        for i, e in enumerate(self.parameter):
 
             for prog in ['marx', 'saomarx']:
-                tab = Table.read('{0}{1}.fits'.format(prog, e), hdu=1)
+                tab = Table.read(os.path.join(self.basepath,
+                                              '{0}{1}.fits'.format(prog, e)),
+                                 hdu=1)
                 # The old question: Is an index the center of a pixel of the corner?
                 # Differs by 0.5...
                 d_ra = (tab['X'] - tab.meta['TCRPX9'] - 0.5) * tab.meta['TCDLT9'] * 3600.
@@ -682,5 +690,110 @@ class CompareMARXSAOTrace(base.MarxTest):
         axecf.legend(loc='lower right')
         axecf.set_ylabel('encircled count fraction')
         axecf.set_xlabel('radius [arcsec]')
+        axecf.grid()
+        fig.savefig(self.figpath('ECF'))
+
+
+class CompMARXSAOTraceoffaxis(CompMARXSAOTraceenergies):
+    '''Compare |marx| and `SAOTrace`_ + |marx| simulations for different
+    off-axis angles. For simplicity, this is done here for a single energy.
+    We pick 4 keV because it is roughly the center of the Chandra band.
+    '''
+
+    title = 'Simulated off-axis PSF'
+
+    summary = "Simulated off-axis PSF"
+
+    figures = OrderedDict([('ECF', {'alternative': 'TBD',
+                                    'caption': 'Radius of encircled count fraction for different off-axis angles. **solid line**: |marx| only, **dotted lines**: `SAOTrace`_ + |marx|. The values shown include the effect of the HRC-I positional uncertainty and the uncertainty in the aspect solution.'})])
+
+    parameter = [0, .5, 1, 2, 3, 5, 7, 10, 15]
+
+    def __init__(self, *args):
+        super(CompMARXSAOTraceenergies, self).__init__(*args)
+        self.marxnames = ['marx{0}'.format(e) for e in self.parameter]
+        self.saonames = ['sao{0}'.format(e) for e in self.parameter]
+
+    @base.Ciao
+    def step_1(self):
+        '''Set up default marx.par file'''
+        com = ['cp {0} marx.par'.format(self.conf.get('marx', 'marxparfile'))]
+        for s in ['GratingType=NONE', 'DetectorType=HRC-I',
+                  'DitherModel=INTERNAL',
+                  'ExposureTime=10000', 'SourceFlux=0.2',
+                  'SourceRA=0.', 'SourceDEC=0.',
+                  'RA_Nom=0.', 'Dec_Nom=0.', 'Roll_Nom=0.',
+                  'MinEnergy=4', 'MaxEnergy=4']:
+            com.append('pset marx.par {0}'.format(s))
+        return com
+
+    @base.Marx
+    def step_2(self):
+        '''run marx for different energies'''
+        marxpars = []
+        for p, n in zip(self.parameter, self.marxnames):
+            marxpars.append({'SourceRA': p / 60., 'OutputDir': n})
+        return marxpars
+
+    @base.SAOTrace
+    def step_10(self):
+        '''Now use `SAOTrace`_'''
+        asolh = fits.getheader(os.path.join(self.basepath,
+                                            'marx_asol1.fits'), 1)
+
+        limit = asolh['TSTOP'] - asolh['TSTART']
+        limit = limit - 0.02
+        com = []
+        for t, e in zip(self.saonames, self.parameter):
+            # The following line has a ' in a " delimited string which itself
+            # is placed inside a ' delimited string like this: '"\'aaa\'"'
+            com.append('trace-nest tag={tag} srcpars="point{{ position = {{ ra = {ra}, dec = 0., ra_aimpt=0., dec_aimpt=0. }}, spectrum = {{ {{ 4., 0.2 }} }} }} roll(0) dither_asol_marx{{ file = \'marx_asol1.fits\', ra = 0., dec = 0., roll = 0. }}" tstart={tstart}  limit={limit} limit_type=sec'.format(tag=t, tstart=asolh['TSTART'] + 0.01, ra=e / 60., limit=limit))
+
+        return com
+
+    @base.Python
+    def step_20(self):
+        '''No image gallery needed'''
+        pass
+
+    @base.Python
+    def step_21(self):
+        '''Plots of radial distribution'''
+        from matplotlib import pyplot as plt
+
+        fig = plt.figure()
+        axecf = fig.add_subplot(111)
+        color = plt.cm.viridis(np.linspace(0, 1, len(self.parameter)))
+
+        ecf = [0.5, 0.7, 0.9]
+        out = np.zeros((len(self.parameter), 2, len(ecf)))
+
+        for i, e in enumerate(self.parameter):
+
+            for prog in ['marx', 'saomarx']:
+                tab = Table.read(os.path.join(self.basepath,
+                                              '{0}{1}.fits'.format(prog, e)),
+                                 hdu=1)
+                # The old question: Is an index the center of a pixel of the corner?
+                # Differs by 0.5...
+                d_ra = (tab['X'] - tab.meta['TCRPX9'] - 0.5) * tab.meta['TCDLT9'] * 3600.
+                # Count from the left or right (RA is reversed on the sky)?
+                d_dec = (tab['Y'] - tab.meta['TCRPX10'] + 0.5) * tab.meta['TCDLT10'] * 3600.
+
+                # The simulation is set up to make this simple: RA=DEC=0
+                # so cos(DEC) = 1 and we can approximate with Euklidian distance
+                r = radial_distribution(d_ra, d_dec)
+                if prog == 'marx':
+                    j = 0
+                else:
+                    j = 1
+                out[i, j, :] = np.percentile(r, np.array(ecf) * 100.)
+
+        for i, e in enumerate(ecf):
+            axecf.plot(self.parameter, out[:, 0, i], color=color[i], lw=2, label='{0} %'.format(e*100))
+            axecf.plot(self.parameter, out[:, 1, i], color=color[i], lw=2, ls=':')
+        axecf.legend(loc='lower right')
+        axecf.set_ylabel('radius [arcsec]')
+        axecf.set_xlabel('off-axis angle [arcmin]')
         axecf.grid()
         fig.savefig(self.figpath('ECF'))

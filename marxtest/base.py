@@ -264,8 +264,8 @@ class Marx2fits(ExternalBaseWrapper):
 class SAOTraceLua(ExternalBaseWrapper):
     '''Wrap a function that writes a lua input file for `SAOTrace`_.
 
-    The ourput of that function is just a string. This string is written to a file
-    called ``saotrace_source.lua`` in the appropriate directory.
+    The output of that function is just a string. This string is written to a
+    file called ``saotrace_source.lua`` in the appropriate directory.
     '''
     interpreter = "lua"
     program = "Lua input for SAOTrace"
