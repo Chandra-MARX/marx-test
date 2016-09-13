@@ -761,11 +761,10 @@ class CompMARXSAOTraceoffaxis(CompMARXSAOTraceenergies):
         '''Plots of radial distribution'''
         from matplotlib import pyplot as plt
 
+        ecf = [0.5, 0.7, 0.9]
         fig = plt.figure()
         axecf = fig.add_subplot(111)
-        color = plt.cm.viridis(np.linspace(0, 1, len(self.parameter)))
-
-        ecf = [0.5, 0.7, 0.9]
+        color = plt.cm.viridis(np.linspace(0, 1, len(ecf)))
         out = np.zeros((len(self.parameter), 2, len(ecf)))
 
         for i, e in enumerate(self.parameter):
