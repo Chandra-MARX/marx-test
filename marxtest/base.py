@@ -27,7 +27,7 @@ class ExternalBaseWrapper(object):
     The `ExternalBaseWrapper` is the base class to define such wrappers.
     '''
 
-    interpreter = 'undefined'
+    interpreter = 'none'
     '''Used to display the source of the wrapped function with a specific
     syntax highlighting.
     '''

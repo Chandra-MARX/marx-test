@@ -17,8 +17,8 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 {{ step.description }}
 
-::
+.. code-block:: {{ step.interpreter }}
 
-{{ step.source()|indent(4, true) }}
+{{ step.source()|indent(3, true) }}
 
 {% endfor %}

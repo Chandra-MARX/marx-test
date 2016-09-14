@@ -18,6 +18,8 @@ from marxtest.utils import colname_case as cc
 
 from marxtest.process_utils import (marxpars_from_asol,
                                     spectrum_from_fluxcorrection)
+# on import, this registers the plotting scale "power"
+from marxtest import plot_utils
 
 tests = ['ACISSPSF', 'ACISIPSF', 'HRCIPSF', 'OffAxisPSF',
          'CompMARXSAOTraceenergies', 'CompMARXSAOTraceoffaxis']
@@ -58,25 +60,26 @@ def plot_ecf(ax, files, filterargs):
     val, edges = np.histogram(r, range=[0, 5], bins=25)
     bin_mid_obs = 0.5 * (edges[:-1] + edges[1:])
     ecf_obs = 1.0 * val.cumsum() / val.sum()
-    ax.semilogx(bin_mid_obs, ecf_obs, 'k', lw=3, label='Observation')
+    ax.plot(bin_mid_obs, ecf_obs, 'k', lw=3, label='Observation')
 
     simmarx = filter_events(Table.read(files[1]), **filterargs)
     r = radial_distribution(simmarx['X'], simmarx['Y'])
     val, edges = np.histogram(r, range=[0, 5], bins=25)
     bin_mid_marx = 0.5 * (edges[:-1] + edges[1:])
     ecf_marx = 1.0 * val.cumsum() / val.sum()
-    ax.semilogx(bin_mid_marx, ecf_marx, 'r', lw=3, label='MARX')
+    ax.plot(bin_mid_marx, ecf_marx, 'r', lw=3, label='MARX')
 
     simmarx = filter_events(Table.read(files[2]), **filterargs)
     r = radial_distribution(simmarx['X'], simmarx['Y'])
     val, edges = np.histogram(r, range=[0, 5], bins=25)
     bin_mid_sao = 0.5 * (edges[:-1] + edges[1:])
     ecf_sao = 1.0 * val.cumsum() / val.sum()
-    ax.semilogx(bin_mid_sao, ecf_sao, 'b', lw=3, label='SAOTrace + MARX')
+    ax.plot(bin_mid_sao, ecf_sao, 'b', lw=3, label='SAOTrace + MARX')
 
+    ax.set_xscale('power', power=1./2.)
     ax.set_xlabel('radius [pixel]')
     ax.set_ylabel('enclosed count fraction')
-    ax.legend(loc='upper left')
+    ax.legend(loc='lower right')
     ax.set_xlim([0.1, 5])
     ax.grid()
 
@@ -169,7 +172,7 @@ class HRCIPSF(base.MarxTest):
                                     'caption': 'Enclosed count fraction for observation and simulations.'})
                        ])
 
-    summary = '''TBD'''
+    summary = '''In contrast to the ACIS simulations, in the HRC-I the observed PSF is in fact narrower than all simulations in the range shown here. The difference is most prominent between about one and two HRC resolution elements where the |marx| simulation is about midway between the true observed PSF shape and the `SAOTrace`_  + |marx| predicted shape.'''
 
     source = {'x': 16405,
               'y': 16500,
@@ -336,7 +339,10 @@ class ACISSPSF(HRCIPSF):
                                     'caption': 'Enclosed count fraction for observation and simulations.'})
                        ])
 
-    summary = '''TBD'''
+    summary = '''For BI chips (here ACIS-S3) the |marx| simulated PSF is too narrow. This effect is most pronounced at small radii around 1 pixel. At larger radii the |marx| simulation comes closer to the observed distribution. Running the simulation with a combination of `SAOTrace`_ and |marx| gives PSF distributions that are closer to the observed numbers. However, in the range around 1 pix, the simulations are still too wide. Depending on the way sub-pixel information is handeled, there is a notable difference in the size of the effect. Using energy-dependent sub-pixel event repositioning (EDSER) required not only a good mirror model, but also a very realisitc treatment of the flight grades assigned on the detector. This is where the difference between simulation and observations is largest.
+
+The put those numbers into perspective: If I used the |marx| simulation to determine the size of the region that I need to extract to enclose 80% of all counts, I would wind a radius close to 0.9 pixel. However, in reality, such a region will only contain about 65% of all flux, causing me to underextimate the total X-ray flux in this source by 15%. (The exact number depends on the spectrum of the source in question, but for most on-axis sources they will be similar.)
+'''
 
     source = {'x': 4096,
               'y': 4074,
@@ -636,7 +642,7 @@ class CompMARXSAOTraceenergies(base.MarxTest):
                                          origin = im[3].origin)
                 grid[i + offset].grid()
                 if prog == 'marx':
-                    grid[i].text(-1, 1., '{0} keV'.format(e))
+                    grid[i].text(-.5, .5, '{0} keV'.format(e))
                 else:
                     grid[i].xaxis.set_major_formatter(StrMethodFormatter('{x:2.1g}'))
 
@@ -687,6 +693,7 @@ class CompMARXSAOTraceenergies(base.MarxTest):
                     axecf.plot(bin_mid_marx, ecf_marx, color=color[i], lw=2, label='{0} keV'.format(e))
                 else:
                     axecf.plot(bin_mid_marx, ecf_marx, color=color[i], lw=2, ls=':')
+        axecf.set_xscale('power', scale = 0.5)
         axecf.legend(loc='lower right')
         axecf.set_ylabel('encircled count fraction')
         axecf.set_xlabel('radius [arcsec]')
