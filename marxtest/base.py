@@ -112,7 +112,9 @@ class Python(ExternalBaseWrapper):
                 # and if they are mentioned in the source code, list them, too.
                 if k in fsource:
                     fsource = textwrap.dedent(''.join(inspect.getsourcelines(v)[0])) + '\n' + fsource
-        return fsource
+        preamble = '# Note that this code might not run if you directly copy and paste it:\n# - Not all import statements are shown here\n# - `self` is a reference to a test instance, which allows access to\n#   parameters such as the directory where the test is run etc.\n\n'
+
+        return preamble + fsource
 
     def __call__(self, obj, conf):
         return self.f(obj)
@@ -399,6 +401,14 @@ class MarxTest(object):
     @property
     def name(self):
         return self.__class__.__name__
+
+    @property
+    def doc(self):
+        '''First line of class doc has no indentation. Bring all lines
+        to the same level.
+        '''
+        t = self.__doc__.split('\n')
+        return t[0] + '\n' + textwrap.dedent('\n'.join(t[1:]))
 
     @property
     def datapath(self):

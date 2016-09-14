@@ -1,13 +1,14 @@
 '''
 |marx| offers several different source shapes. Tests in this module exercise
 those sources (except ``SAOSAC``, which is heavily used in
-:ref:`sect-PSF` already).
+:ref:`sect-tests.PSF` already).
 
 
 '''
 import shutil
 import subprocess
 import os
+from collections import OrderedDict
 from marxtest import base
 
 title = 'Sources in |marx|'
@@ -26,7 +27,7 @@ class GeometricSources(base.MarxTest):
     title = 'Build-in geometric sources'
 
     figures = OrderedDict([('ds9', {'alternative': 'Six PSFs.',
-                                    'caption': '`ds9`_ image of the simulated PSFs in alphabeticcal order (beta distribution, disk, disk with hole, Gauss, line, and point.'})
+                                    'caption': '`ds9`_ image of the simulated PSFs in alphabetical order (beta distribution, disk, disk with hole, Gauss, line, and point).'})
                        ])
 
     @base.Marx

@@ -1,11 +1,12 @@
 '''
 |marx| allows users to specify either a flat input spectrum or to pass in a file.
 Here, we generate input spectra with the spectral modeling program `Sherpa`_.
-Using the `Sherpa`_ model spectrum as an input file, we then run |marx| to
-simulate a point source and extract the data from that simulation, read it back
-into `Sherpa`_ and fit the simulated data.
+We run |marx| to
+simulate a point source and extract the data from that simulation using `CIAO`_,
+read it back into `Sherpa`_ and fit the simulated data.
 If everything works well and all detector effects are treated consistently,
-we should recover the same spectral parameters. On the other hand, if |marx|
+we should recover the same spectral parameters (up to Poisson noise).
+On the other hand, if |marx| and
 `CIAO`_ are inconsistent the fit parameters will deviate from the input
 parameters.
 
@@ -45,7 +46,7 @@ class SpectrumAbsPowACISS(base.MarxTest):
     title = 'Absorbed powerlaw on ACIS-S'
 
     figures = OrderedDict([('spec', {'alternative': 'Spectra and model shown in top of each other. Differences are described in the text.',
-                                     'caption': 'Data reduced as required to reproduce the |marx| setup (see :ref:`caveats`) is shown in green, data reduced with standard `CIAO`_ setting in orange. THe orange error bars are omitted for clarity. In this display, green and orange points should be on top of each other, but the next figure shows that real differences exist when ARF is needed to calculate the flux. Line show the input model (blue, using the ARF of the green data), the best-fit model to the green data (green line) and to the orange data (orange line).'}),
+                                     'caption': 'Data reduced as required to reproduce the |marx| setup (see :ref:`caveats`) is shown in green, data reduced with standard `CIAO`_ setting in orange. The orange error bars are omitted for clarity. In this display, green and orange points should be on top of each other, but the next figure shows that real differences exist when ARF is needed to calculate the flux. Lines show the input model (red, using the ARF of the green data), the best-fit model to the green data (green line) and to the orange data (orange line).'}),
                            ('arf', {'alternative': 'ARFs differ in the range 2-5 keV',
                                     'caption': 'ARFs for both extraction methods (some color as above).'}),
                            ])
@@ -68,9 +69,8 @@ class SpectrumAbsPowACISS(base.MarxTest):
 
     In a Monte-Carlo simulation we can never expect the fit to hit the input values exactly.
     In fact, a perfect agreement between input and output numbers would indicate
-    that the random number generator is not random enough. On average, fit values that are
-    roughly 1 sigma away are reasonable. However, we have run this example only once, so
-    larger deviations are possible by chance.
+    that the random number generator is not random enough. When running this example
+    many times, the average distance should be roughly 1 sigma.
     '''
     source = {'x': 4096.5,
               'y': 4096.5,

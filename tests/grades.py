@@ -57,7 +57,7 @@ def plot22(obs, sim, colname, energies=[[300, 1000], [1000, 2000]]):
 
 
 class ACIS_BI_low_energy(base.MarxTest):
-    '''This test compares the distribution of event grades between an observation of a young star observed on the back-illuminated S3 chip and the simulation. To avoid pile-up the observation used a sub-array read-out, but this does not influence the grade distribution.
+    '''This test compares the distribution of event grades between an observation of a young star observed on the back-illuminated S3 chip and the simulation. To avoid pile-up the observation used a sub-array read-out.
 
 The grade distribution depends on the energy of the incoming photons. To get things exactly right, marx thus has to run with the source spectrum as an input spectrum. However, the grade distribution changes slowly with energy, so this only matters when grade distribution over a large range of energy are compared. Here, marx is run with a constant input spectrum and the comparison between simulation and observation is done in narrow energy bands only.
 
@@ -71,13 +71,13 @@ In this particular case, there is very little source signal above 2 keV, so the 
     title = 'Grades on an ACIS-BI chip'
 
     figures = OrderedDict([('grades', {'alternative': 'Four pie charts that display the distribution of grades for observation and simulation for two different energy bands',
-                                      'caption': 'These pie charts show the distribution of grades in ASCA nomenclature (0-6). In a real observation the distribution of grades depends on the energy of the incoming photons.'}),
+                                      'caption': 'These pie charts show the distribution of grades in ASCA nomenclature (0-6) in two different energy bands.'}),
                            ('fltgrades', {'alternative': 'Four pie charts that display the distribution of grades for observation and simulation for two different energy bands',
                                           'caption': 'Same as the above, but using the more detailed Chandra flight grade numbers.'})
                        ])
 
 
-    summary = '''Both plots clearly show that MARX does not do a good job either at reproducing the distribution of grades in the first place in general, nor in reproducing the energy dependence. In the current implementation the MARX splits each pixel into a grid of 3*3 subpixels and the grade distribution for each of those sub-pixels is hardcoded.'''
+    summary = '''Both plots clearly show that MARX does not do a good job either at reproducing the distribution of grades in general, nor in reproducing the energy dependence.'''
 
     @base.Ciao
     def step_0(self):

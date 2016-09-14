@@ -16,13 +16,16 @@
 {% endif %}
 :code: :ref:`test-code-{{testinstance.name}}`
 
-{{ testinstance.__doc__ }}
+{{ testinstance.doc }}
 
 {% for figname, figure in testinstance.figures.iteritems() %}
 
 .. figure:: {{ figpath }}/{{testinstance.name}}_{{ figname }}.*
    :align: center
    :alt: {{ figure.alternative }}
+   :scale: {{ figure.scale|default('75%') }}
+   :width: {{ figure.width }}
+   :height:  {{ figure.height }}
 
    {{ figure.caption }}
 

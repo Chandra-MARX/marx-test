@@ -1,15 +1,13 @@
 '''
-The `point-spread function (PSF) for Chandra <http://cxc.harvard.edu/ciao/PSFs/psf_central.html>`_ describes how the light from a point source is spread over a larger area on the detector. Several effects contribute to this, e.g. the uncertainty in the pointing, imperfections in the mirror (specifically for large off-axis angles) and the pixalization of data on detector read-out.
+The `point-spread function (PSF) for Chandra <http://cxc.harvard.edu/ciao/PSFs/psf_central.html>`_ describes how the light from a point source is spread over a larger area on the detector. Several effects contribute to this, e.g. the uncertainty in the pointing, the fact that the detectors are flat, while the focal plane of the mirror is curved (specifically for large off-axis angles) and the pixalization of data on detector read-out.
 
 The following tests compare |marx| simulations, `SAOTrace`_ simulations, and data to look at different aspects of the Chandra PSF.
 '''
 from __future__ import division
 
 import os
-import shutil
 import numpy as np
 from collections import OrderedDict
-from matplotlib import pyplot as plt
 from astropy.table import Table
 from astropy.io import fits
 
@@ -76,10 +74,11 @@ def plot_ecf(ax, files, filterargs):
     ecf_sao = 1.0 * val.cumsum() / val.sum()
     ax.plot(bin_mid_sao, ecf_sao, 'b', lw=3, label='SAOTrace + MARX')
 
-    ax.set_xscale('power', power=1./2.)
+    ax.set_xscale('power', power=0.5)
     ax.set_xlabel('radius [pixel]')
     ax.set_ylabel('enclosed count fraction')
     ax.legend(loc='lower right')
+    ax.set_xticks([.1, .4, .7, 1, 2, 3, 4, 5])
     ax.set_xlim([0.1, 5])
     ax.grid()
 
@@ -211,6 +210,7 @@ class HRCIPSF(base.MarxTest):
         Spectrum files are part of the marx-test distribution.
         Copy them from the source code into the right directory.
         '''
+        import shutil
         shutil.copy(os.path.join(self.pkg_data, 'ARLac_input_spec_marx.tbl'),
                     os.path.join(self.basepath, 'input_spec_marx.tbl'))
         shutil.copy(os.path.join(self.pkg_data, 'ARLac_input_spec_saotrace.rdb'),
@@ -300,6 +300,7 @@ point{{ position = {{ ra = {ra},
     @base.Python
     def step_20(self):
         '''Extract radial count distribution'''
+        import matplotlib.pyplot as plt
         filterargs = {'circle': (self.source['x'], self.source['y'],
                                  5 * self.source['r'])
                       }
@@ -322,8 +323,10 @@ class ACISSPSF(HRCIPSF):
     '''
     The PSF depends on many things, some of which are common to all observations
     like the shape of the mirror, and some are due to detector effects.
-    For ACIS detectors, the sub-pixel event repositioning (EDSER) can improve
-    the quality of an image, by repositioning events based on the event grade.
+    For ACIS detectors, the
+    `sub-pixel event repositioning (EDSER) <http://cxc.harvard.edu/ciao/why/acissubpix.html>`_
+    can improve
+    the quality of an image by repositioning events based on the event grade.
     This correction depends on the type pf chip (FI or BI). This test compares
     the simulation of a point source on a BI ACIS-S chip to an observation.
     The observed object is TYC 8241 2652 1, a young star, and was observed in
@@ -336,12 +339,14 @@ class ACISSPSF(HRCIPSF):
     download_all = True
 
     figures = OrderedDict([('ECF', {'alternative': 'TBD',
-                                    'caption': 'Enclosed count fraction for observation and simulations.'})
+                                    'caption': 'Enclosed count fraction for observation and simulations. The simulations are run with a count number similar to the (fairly short) observation and thus there is some wiggling due to Poisson noise.'})
                        ])
 
-    summary = '''For BI chips (here ACIS-S3) the |marx| simulated PSF is too narrow. This effect is most pronounced at small radii around 1 pixel. At larger radii the |marx| simulation comes closer to the observed distribution. Running the simulation with a combination of `SAOTrace`_ and |marx| gives PSF distributions that are closer to the observed numbers. However, in the range around 1 pix, the simulations are still too wide. Depending on the way sub-pixel information is handeled, there is a notable difference in the size of the effect. Using energy-dependent sub-pixel event repositioning (EDSER) required not only a good mirror model, but also a very realisitc treatment of the flight grades assigned on the detector. This is where the difference between simulation and observations is largest.
+    summary = '''For BI chips (here ACIS-S3) the |marx| simulated PSF is too narrow. This effect is most pronounced at small radii around 1 pixel. At larger radii the |marx| simulation comes closer to the observed distribution. Running the simulation with a combination of `SAOTrace`_ and |marx| gives PSF distributions that are closer to the observed numbers. However, in the range around 1 pix, the simulations are still too wide. Depending on the way sub-pixel information is handeled, there is a notable difference in the size of the effect. Using energy-dependent sub-pixel event repositioning (EDSER) requires not only a good mirror model, but also a realistic treatment of the flight grades assigned on the detector. This is where the difference between simulation and observations is largest.
 
-The put those numbers into perspective: If I used the |marx| simulation to determine the size of the region that I need to extract to enclose 80% of all counts, I would wind a radius close to 0.9 pixel. However, in reality, such a region will only contain about 65% of all flux, causing me to underextimate the total X-ray flux in this source by 15%. (The exact number depends on the spectrum of the source in question, but for most on-axis sources they will be similar.)
+The figures show that there are at least two factors contributing to the difference: The mirror model and problems in the simulation of the EDSER algorithm.
+
+The put those numbers into perspective: If I used the |marx| simulation to determine the size of the extraction region that encloses 80% of all source counts, I would find a radius close to 0.9 pixel. However, in reality, such a region will only contain about 65% of all flux, causing me to underestimate the total X-ray flux in this source by 15%. (The exact number depends on the spectrum of the source in question, but for most on-axis sources they will be similar.)
 '''
 
     source = {'x': 4096,
@@ -395,6 +400,8 @@ The put those numbers into perspective: If I used the |marx| simulation to deter
     @base.Python
     def step_20(self):
         '''Compare radial event distributions'''
+        import matplotlib.pyplot as plt
+
         filterargs = {'energy': [300, 3000],
                       'circle': (self.source['x'], self.source['y'],
                                  5 * self.source['r'])
@@ -433,7 +440,7 @@ class ACISIPSF(ACISSPSF):
                                     'caption': 'Enclosed count fraction for observation and simulations.'})
                        ])
 
-    summary = '''TBD'''
+    summary = '''As for the BI chip, |marx| simulations indicate a PSF that is narrower than the observed distribution. Using `SAOTrace`_ as a mirror model, gives better results but they still differ significantly from the observed distribution.'''
 
     source = {'x': 4140,
               'y': 4102,
@@ -502,21 +509,17 @@ class CompMARXSAOTraceenergies(base.MarxTest):
     The `Chandra Proposers Observatory Guide <http://cxc.harvard.edu/proposer/POG/html/chap4.html#tth_sEc4.2.3>`_
     contains a long section on the PSF and encircled energy based on `SAOTrace`_
     simulations. Some of those simulations are repeated here to compare them
-    to pure |marx| simulations:
-
-    - Delta function spectra with different energy to cleanly show how the PSF changes with energy.
-    - Spectra with different absorbed powerlaws to show how the PSF might differ in practice.
-    - PSFs at different off-axis angles.
+    to pure |marx| simulations.
     '''
 
-    title = 'On axis PSF at different energies'
+    title = 'On-axis PSF at different energies'
 
-    summary = "TBD"
+    summary = "|marx| and `SAOTrace`_ simulations predict a very similar PSF shape, but for most energies the `SAOTrace`_ model predicts a slightly broader PSF."
 
-    figures = OrderedDict([('PSFimages', {'alternative': 'Gallery of PSf images. See caption for a desription.',
-                                          'caption': 'PSF images for different discrete energies for pure |marx| and `SAOTrace`_ + |marx| simulations. The color scale is linear, but the absolute scaling is different for different images, because the effective area and thus the number of detected photons is lower at higher energies. Contour lines mark flux levels at 30%, 60%, and 90% of the peak flux level. At higher energies, the PSF becomes asymmetric, because mirror pair 6, which is most important at high energies is slightly tilted with respect to the nominal aimpoint. At the same time, the scatter, and thus the size of the PSF increase at higher energies. This is seen in both types of simulations.'}),
+    figures = OrderedDict([('PSFimages', {'alternative': 'Gallery of PSf images. See caption for a description.',
+                                          'caption': 'PSF images for different discrete energies for pure |marx| and `SAOTrace`_ + |marx| simulations. The color scale is linear, but the absolute scaling is different for different images, because the effective area and thus the number of detected photons is lower at higher energies. Contour lines mark flux levels at 30%, 60%, and 90% of the peak flux level. At higher energies, the PSF becomes asymmetric, because mirror pair 6, which is most important at high energies, is slightly tilted with respect to the nominal aimpoint. At the same time, the scatter, and thus the size of the PSF, increase at higher energies.'}),
                            ('ECF', {'alternative': 'The |marx| PSF is generally narrower than the  `SAOTrace`_ + |marx| PSF. The agreement is best for energies around 2-4 keV.',
-                                    'caption': 'Encircled count fraction for the same simulations as above. **solid line**: |marx| only, **dotted lines**: `SAOTrace`_ + |marx|. For each photon, the radial distance is calculated from the nominal source position. Because the center is offset for hard photons, the PSF appears wide at those energies.'})])
+                                    'caption': 'A different way to present the width of the PSF is the encircled count fraction. **solid line**: |marx| only, **dotted lines**: `SAOTrace`_ + |marx|. For each photon, the radial distance is calculated from the nominal source position. Because the center is offset for hard photons, the PSF appears wider at those energies.'})])
 
     parameter = [0.25, 0.5, 1, 2, 3, 4, 6, 8]
 
@@ -584,7 +587,7 @@ class CompMARXSAOTraceenergies(base.MarxTest):
         for s, n in zip(self.saonames, self.marxnames):
             marxpars.append({'SourceType': 'SAOSAC', 'SAOSACFile': s + '.fits',
                              'OutputDir': 'sao' + n,
-                             'DitherModel':'FILE',
+                             'DitherModel': 'FILE',
                              'DitherFile': 'marx_asol1.fits'})
         return marxpars
 
@@ -599,9 +602,11 @@ class CompMARXSAOTraceenergies(base.MarxTest):
     @base.Python
     def step_20(self):
         '''Image gallery of PSFs'''
+        import numpy as np
         from matplotlib import pyplot as plt
         from mpl_toolkits.axes_grid1 import AxesGrid
         from matplotlib.ticker import StrMethodFormatter
+        from astropy.table import Table
 
         fig = plt.figure(figsize=(10, 4))
 
@@ -639,7 +644,7 @@ class CompMARXSAOTraceenergies(base.MarxTest):
                                          # for some reason, the data is
                                          # ordered for other orientation
                                          im[0].T, levels=levels, colors='k',
-                                         origin = im[3].origin)
+                                         origin=im[3].origin)
                 grid[i + offset].grid()
                 if prog == 'marx':
                     grid[i].text(-.5, .5, '{0} keV'.format(e))
@@ -666,7 +671,10 @@ class CompMARXSAOTraceenergies(base.MarxTest):
     @base.Python
     def step_21(self):
         '''Plots of radial distribution'''
+        import os
+        import numpy as np
         from matplotlib import pyplot as plt
+        from astropy.table import Table
 
         fig = plt.figure()
         axecf = fig.add_subplot(111)
@@ -693,10 +701,11 @@ class CompMARXSAOTraceenergies(base.MarxTest):
                     axecf.plot(bin_mid_marx, ecf_marx, color=color[i], lw=2, label='{0} keV'.format(e))
                 else:
                     axecf.plot(bin_mid_marx, ecf_marx, color=color[i], lw=2, ls=':')
-        axecf.set_xscale('power', scale = 0.5)
+        axecf.set_xscale('power', power=0.5)
         axecf.legend(loc='lower right')
         axecf.set_ylabel('encircled count fraction')
         axecf.set_xlabel('radius [arcsec]')
+        axecf.set_xticks([0, .1, .2, .4, .6, .8, 1, 2, 3, 4, 5])
         axecf.grid()
         fig.savefig(self.figpath('ECF'))
 
@@ -709,7 +718,7 @@ class CompMARXSAOTraceoffaxis(CompMARXSAOTraceenergies):
 
     title = 'Simulated off-axis PSF'
 
-    summary = "Simulated off-axis PSF"
+    summary = "|marx| and |marx| + `SAOTrace`_ simulations show essentially identical off-axis behavior in this test."
 
     figures = OrderedDict([('ECF', {'alternative': 'TBD',
                                     'caption': 'Radius of encircled count fraction for different off-axis angles. **solid line**: |marx| only, **dotted lines**: `SAOTrace`_ + |marx|. The values shown include the effect of the HRC-I positional uncertainty and the uncertainty in the aspect solution.'})])
@@ -766,7 +775,10 @@ class CompMARXSAOTraceoffaxis(CompMARXSAOTraceenergies):
     @base.Python
     def step_21(self):
         '''Plots of radial distribution'''
+        import os
+        import numpy as np
         from matplotlib import pyplot as plt
+        from astropy.table import Table
 
         ecf = [0.5, 0.7, 0.9]
         fig = plt.figure()
