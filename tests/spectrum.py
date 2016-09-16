@@ -28,7 +28,8 @@ from collections import OrderedDict
 
 from marxtest import base
 
-tests = ['SpectrumAbsPowACISS', 'SpectrumAPECACISI']
+tests = ['SpectrumAbsPowACISS', 'SpectrumAbsPowACISS_offaxis'
+         'SpectrumAPECACISI']
 
 title = 'Reproducing an input spectrum'
 
@@ -218,7 +219,10 @@ class SpectrumAbsPowACISS(base.MarxTest):
 
         dmextract infile="$evtfile[sky={src}][bin $phagrid]" outfile="$phafile" clobber=yes
 
-        ccdid={ccd_id};
+        dmcoords $evtfile asol=$asolfile option=sky x={x} y={y}
+        ccdid=$(pget dmcoords chip_id)
+        chipx=$(pget dmcoords chipx)
+        chipy=$(pget dmcoords chipy)
 
         detname="ACIS-$ccdid;UNIFORM;bpmask=0"
         grating="NONE"
@@ -229,17 +233,12 @@ class SpectrumAbsPowACISS(base.MarxTest):
         outfile="$arffile" obsfile="$evtfile" engrid="$engrid" asphistfile="$asphistfile" \
         sourcepixelx={x} sourcepixely={y} maskfile=NONE pbkfile=NONE dafile=NONE clobber=yes verbose=0
 
-        # Mean chip position
-        chipx=512;
-        chipy=512;
-
         fef="$CALDB/data/chandra/acis/fef_pha/acisD2000-01-29fef_phaN0005.fits"
 
         cxfilter="chipx_hi>=$chipx,chipx_lo<=$chipx"
         cyfilter="chipy_hi>=$chipy,chipy_lo<=$chipy"
         mkrmf infile="$fef[ccd_id=$ccdid,$cxfilter,$cyfilter]" outfile="$rmffile" axis1="energy=$engrid" axis2="$phagrid" thresh=1e-8 clobber=yes verbose=0
-        '''.format(src=self.src_reg, x=self.source['x'], y=self.source['y'],
-                   ccd_id=self.source['ccd_id'])
+        '''.format(src=self.src_reg, x=self.source['x'], y=self.source['y'])
         commands = dedent(commands)
         return commands.split('\n')
 
@@ -349,6 +348,52 @@ class SpectrumAbsPowACISS(base.MarxTest):
         self.save_test_result('arfdiff', sherpaout['arfdiff'])
 
 
+class SpectrumAbsPowACISS_offaxis(SpectrumAbsPowACISS):
+    '''Same as above, but for an off-axis source.'''
+
+    title = 'Powerlaw spectrum of an off-axis source'
+
+    _summary = '''
+    The table shows how the best fit of the simulated and extracted data
+    compares to the parameter values that were used to generate the input
+    spectrum.
+
+    See above for a detailed description.
+    '''
+    source = {'x': 4200,
+              'y': 5200,
+              'r': 200,
+              'ccd_id': 1,
+              'detector_type': "ACIS-I"}
+    '''Source position and extraction radius.
+
+    This is used to automatically extract a source spectrum that can be used as
+    input for |marx| and `SAOTrace`_ runs.
+    x,y,r are given in "physical" pixel units on the detector.
+    '''
+
+    @base.Marx
+    def step_2(self):
+        '''Point source'''
+        pars = {'SourceFlux': -1,
+                'SpectrumType': "FILE",
+                'SpectrumFile': "marx_input.tbl",
+                'ExposureTime': 30000,
+                'TStart': 2015.5,
+                'OutputDir': 'marx',
+                'GratingType': "NONE",
+                'DetectorType': self.source['detector_type'],
+                'DitherModel': "INTERNAL",
+                'RA_Nom': 30,
+                'Dec_Nom': 40,
+                'SourceRA': 29.9814917,  # hardcode pos here because much
+                                         # easier than calling ciao dmcoords
+                'SourceDEC': 40.1508083,
+                }
+        return pars
+
+
+
 class SpectrumAPECACISI(SpectrumAbsPowACISS):
     '''Same as above, but for a front-illuminated ACIS-I chip and using
     an input spectrum with two thermal components similar to a stellar corona.
@@ -380,4 +425,4 @@ class SpectrumAPECACISI(SpectrumAbsPowACISS):
                                   'a2.Ne = a1.Ne'],
                    'set_source2': 'set_source(2, a1 + a2)',
                    'parnames': ('a1.kT', 'a1.Ne', 'a1.norm', 'a2.kT', 'a2.norm'),
-                   'parvals': (0.7, 2.0, 0.00005, 2.0, 0.0001)}
+                   'parvals': (0.7, 2.0, 0.0002, 2.0, 0.0004)}

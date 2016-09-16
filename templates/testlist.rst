@@ -24,8 +24,12 @@
    :align: center
    :alt: {{ figure.alternative }}
    :scale: {{ figure.scale|default('75%') }}
+{% if figure.width %}
    :width: {{ figure.width }}
+{% endif %}
+{% if figure.height %}
    :height:  {{ figure.height }}
+{% endif %}
 
    {{ figure.caption }}
 

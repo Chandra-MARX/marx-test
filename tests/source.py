@@ -134,7 +134,7 @@ class ImageSource(base.MarxTest):
     @base.Ciao
     def step_30(self):
         '''ds9 images of the PSF'''
-        return ['''ds9 -width 800 -height 500 -log -cmap heat input_image.fits image.fits -pan to 4018 4141 physical -saveimage {0} -exit'''.format(self.figpath(self.figures.keys()[0]))]
+        return ['''ds9 -width 800 -height 500 -log -cmap heat input_image.fits image.fits -pan to 4018 4141 physical -zoom 0.5 -saveimage {0} -exit'''.format(self.figpath(self.figures.keys()[0]))]
 
 
 class RayfileSource(base.MarxTest):
