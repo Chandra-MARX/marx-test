@@ -10,6 +10,7 @@ import numpy as np
 from collections import OrderedDict
 from astropy.table import Table
 from astropy.io import fits
+import astropy
 
 from marxtest import base
 from marxtest.utils import colname_case as cc
@@ -152,8 +153,8 @@ def radial_distribution(x, y):
     r : np.array
         radial distance from mean position of the events.
     '''
-    centx = x - np.median(x)
-    centy = y - np.median(y)
+    centx = x - astropy.stats.sigma_clipped_stats(x, sigma=1.5, iters=20)[0]
+    centy = y - astropy.stats.sigma_clipped_stats(y, sigma=1.5, iters=20)[0]
 
     xy = np.vstack([centx, centy])
     return np.linalg.norm(xy, axis=0)
