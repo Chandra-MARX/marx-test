@@ -1,5 +1,6 @@
 from warnings import warn
 import subprocess
+from collections import OrderedDict
 
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
@@ -7,7 +8,11 @@ from astropy.coordinates.name_resolve import NameResolveError
 
 
 def detectorfromkeyword(keyword):
-    '''Determine detector type form fits header keyword
+    '''Determine detector type from fits header keyword
+
+    For ACIS, this uses a heuristic to decide which chips are on,
+    since Chandra allows arbitrary combinations,
+    but MARX only know ACIS-I or ACIS-S.
 
     Parameters
     ----------
@@ -27,7 +32,7 @@ def detectorfromkeyword(keyword):
         # allows arbitrary combinations, but MARX only know ACIS-I or ACIS-S
         acisi = len(set(keyword).intersection(set('0123')))
         aciss = len(set(keyword).intersection(set('456789')))
-        if acisi >= aciss:
+        if acisi > aciss:
             return 'ACIS-I'
         else:
             return 'ACIS-S'
@@ -84,15 +89,16 @@ def marxpars_from_asol(asolfile, evt2file):
     asol = fits.getheader(asolfile, 1)
     evt = fits.getheader(evt2file, 1)
 
-    marx_pars = {'RA_Nom': asol['RA_NOM'],
-                 'Dec_Nom': asol['DEC_NOM'],
-                 'Roll_Nom': asol['ROLL_NOM'],
-                 'GratingType': asol['GRATING'],
-                 'ExposureTime': asol['TSTOP'] - asol['TSTART'],
-                 'DitherModel': 'FILE',
-                 'DitherFile': asolfile,
-                 'TStart': asol['TSTART'],
-    }
+    marx_pars = OrderedDict()
+    marx_pars['RA_Nom'] = asol['RA_NOM']
+    marx_pars['Dec_Nom'] = asol['DEC_NOM']
+    marx_pars['Roll_Nom'] = asol['ROLL_NOM']
+    marx_pars['GratingType'] = asol['GRATING']
+    marx_pars['ExposureTime'] = asol['TSTOP'] - asol['TSTART']
+    marx_pars['DitherModel'] = 'FILE'
+    marx_pars['DitherFile'] = asolfile
+    marx_pars['TStart'] = asol['TSTART']
+
     # ACIS Exposure time (might vary for sub-array read-out)
     if evt['INSTRUME'][0:4] == 'ACIS':
         marx_pars['ACIS_Exposure_Time'] = evt['EXPTIME']
@@ -165,7 +171,7 @@ asphist infile={asolfile} outfile=obs.asp evtfile={evtfile} clobber=yes
 mkarf detsubsys={det} grating={grating} outfile=obs.arf obsfile={evtfile} asphistfile=obs.asp sourcepixelx={x} sourcepixely={y} engrid="0.3:8.0:0.1" maskfile=NONE pbkfile=NONE dafile=NONE verbose=1 mode=h clobber=yes
 
 # We have to use the same energy binning in energy space here that we used for the arf!
-# So, first convert the PI to energy (to a precision that's good enough for this example.
+# So, first convert the PI to energy (to a precision that's good enough).
 dmtcalc "{evtfile}[EVENTS][sky={region}]" evt2_with_energy.fits  expr="energy=(float)pi*0.0149" clobber=yes
 dmextract "evt2_with_energy.fits[bin energy=.3:7.999:0.1]" obs.spec clobber=yes opt=generic
 dmcopy "obs.arf[cols energ_lo,energ_hi,specresp]" input_spec.fits clobber=yes
@@ -180,8 +186,8 @@ dmcopy "input_spec_3.fits[cols energ_lo,energ_hi,flux]" "input_spec_saotrace.tbl
 # We now use a combination of some of the most obscure UNIX tools to
 # bring the SAOTRACE input spectrum into the right format
 # see http://cxc.harvard.edu/cal/Hrma/RDB/FileFormat.html
-# Remove the leading "#" from the line with the column names
 
+# Remove the leading "#" from the line with the column names
 awk '{{ sub(/\\# ENERG_LO/,"ENERG_LO"); print }}' < input_spec_saotrace.tbl > input_spec_saotrace.temp
 # Then, replace spaces with tabs
 tr ' ' \\\\t < input_spec_saotrace.temp > input_spec_saotrace.rdb
