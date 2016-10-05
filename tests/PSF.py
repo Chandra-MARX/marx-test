@@ -11,6 +11,7 @@ from collections import OrderedDict
 from astropy.table import Table
 from astropy.io import fits
 import astropy
+import astropy.stats
 
 from marxtest import base
 from marxtest.utils import colname_case as cc
@@ -26,7 +27,7 @@ tests = ['ACISSPSF', 'ACISIPSF', 'HRCIPSF', 'OffAxisPSF',
 title = 'Point Spread Function (PSF)'
 
 
-def plot_ecf(ax, files, filterargs):
+def plot_ecf(ax, files, filterargs, bgfilterargs):
     '''
     Parameters
     ----------
@@ -37,6 +38,8 @@ def plot_ecf(ax, files, filterargs):
         Marx simulation, and SAOTRace + marx simulation
     filterargs : dict
         See ``filter_events`` for details
+    bgfilterargs : dict
+        Select a background region (same size, no automatic scaling)
 
     Returns
     -------
@@ -55,25 +58,21 @@ def plot_ecf(ax, files, filterargs):
     # In this energy range we have the most counts and we limited
     # the simulations to the same range.
     obs = filter_events(Table.read(files[0]), **filterargs)
-    r = radial_distribution(obs['x'], obs['y'])
-    val, edges = np.histogram(r, range=[0, 5], bins=25)
-    bin_mid_obs = 0.5 * (edges[:-1] + edges[1:])
-    ecf_obs = 1.0 * val.cumsum() / val.sum()
-    ax.plot(bin_mid_obs, ecf_obs, 'k', lw=3, label='Observation')
+    bkg = filter_events(Table.read(files[0]), **bgfilterargs)
+    r_obs = radial_distribution(obs['x'], obs['y'])
+    r_obs.sort()
+    ax.plot(r_obs, np.linspace(0, 1 + len(bkg) / len(r_obs), len(r_obs)),
+            'k', lw=3, label='Observation')
 
     simmarx = filter_events(Table.read(files[1]), **filterargs)
-    r = radial_distribution(simmarx['X'], simmarx['Y'])
-    val, edges = np.histogram(r, range=[0, 5], bins=25)
-    bin_mid_marx = 0.5 * (edges[:-1] + edges[1:])
-    ecf_marx = 1.0 * val.cumsum() / val.sum()
-    ax.plot(bin_mid_marx, ecf_marx, 'r', lw=3, label='MARX')
+    r_marx = radial_distribution(simmarx['X'], simmarx['Y'])
+    r_marx.sort()
+    ax.plot(r_marx, np.linspace(0, 1, len(r_marx)), 'r', lw=3, label='MARX')
 
-    simmarx = filter_events(Table.read(files[2]), **filterargs)
-    r = radial_distribution(simmarx['X'], simmarx['Y'])
-    val, edges = np.histogram(r, range=[0, 5], bins=25)
-    bin_mid_sao = 0.5 * (edges[:-1] + edges[1:])
-    ecf_sao = 1.0 * val.cumsum() / val.sum()
-    ax.plot(bin_mid_sao, ecf_sao, 'b', lw=3, label='SAOTrace + MARX')
+    simsao = filter_events(Table.read(files[2]), **filterargs)
+    r_sao = radial_distribution(simsao['X'], simsao['Y'])
+    r_sao.sort()
+    ax.plot(r_sao, np.linspace(0, 1, len(r_sao)), 'b', lw=3, label='SAOTrace + MARX')
 
     ax.set_xscale('power', power=0.5)
     ax.set_xlabel('radius [pixel]')
@@ -81,14 +80,15 @@ def plot_ecf(ax, files, filterargs):
     ax.legend(loc='lower right')
     ax.set_xticks([.1, .4, .7, 1, 2, 3, 4, 5])
     ax.set_xlim([0.1, 5])
+    ax.set_ylim([0, 1.])
     ax.grid()
 
-    psf90_marx = np.interp(0.9, ecf_marx, bin_mid_marx)
-    ecf_at_that_rad = np.interp(psf90_marx, bin_mid_obs, ecf_obs)
+    psf90_marx = np.percentile(r_marx, 90)
+    ecf_at_that_rad = np.argmin(np.abs(r_obs - psf90_marx)) / len(r_obs)
     err_marx = ecf_at_that_rad / 0.9 - 1
 
-    psf90_sao = np.interp(0.9, ecf_marx, bin_mid_sao)
-    ecf_at_that_rad = np.interp(psf90_sao, bin_mid_obs, ecf_obs)
+    psf90_sao = np.percentile(r_sao, 90)
+    ecf_at_that_rad = np.argmin(np.abs(r_obs - psf90_sao)) / len(r_obs)
     err_sao = ecf_at_that_rad / 0.9 - 1
 
     return err_marx, err_sao
@@ -176,7 +176,10 @@ class HRCIPSF(base.MarxTest):
 
     source = {'x': 16405,
               'y': 16500,
-              'r': 15}
+              'r': 15,
+              'bg_x': 16043,
+              'bg_y': 16700
+    }
     '''Source position and extraction radius.
 
     This is used to automatically extract a source spectrum that can be used as
@@ -306,13 +309,18 @@ point{{ position = {{ ra = {ra},
                                  5 * self.source['r'])
                       }
 
+        bgfilterargs =  {'circle': (self.source['bg_x'], self.source['bg_y'],
+                                 5 * self.source['r'])
+                        }
+
         evt2file = self.get_data_file('evt2')
         files = [evt2file, 'marx_only.fits', 'marx_saotrace.fits']
 
         fig = plt.figure(figsize=(10, 5))
         ax = fig.add_subplot(111)
 
-        err_marx, err_sao = plot_ecf(ax, files, filterargs)
+        err_marx, err_sao = plot_ecf(ax, files, filterargs, bgfilterargs)
+        ax.set_xlim([0, 20.])
 
         fig.savefig(self.figpath(self.figures.keys()[0]))
 
@@ -352,7 +360,9 @@ The put those numbers into perspective: If I used the |marx| simulation to deter
 
     source = {'x': 4096,
               'y': 4074,
-              'r': 4}
+              'r': 4,
+              'bg_x': 4044,
+              'bg_y': 4123}
     '''Source position and extraction radius.
 
     This is used to automatically extract a source spectrum that can be used as
@@ -383,12 +393,12 @@ The put those numbers into perspective: If I used the |marx| simulation to deter
 
     @base.Marx2fits
     def step_10(self):
-        '''USE RANDOMAIXE as an alternative to EDSER'''
+        '''USE RANDOMIZE as an alternative to EDSER'''
         return ('--pixadj=RANDOMIZE', 'marx_only', 'marx_only_rand.fits')
 
     @base.Marx2fits
     def step_11(self):
-        '''Again, same settign as above'''
+        '''Again, same setting as above'''
         return ('--pixadj=RANDOMIZE', 'marx_saotrace', 'marx_saotrace_rand.fits')
 
     @base.Ciao
@@ -406,7 +416,11 @@ The put those numbers into perspective: If I used the |marx| simulation to deter
         filterargs = {'energy': [300, 3000],
                       'circle': (self.source['x'], self.source['y'],
                                  5 * self.source['r'])
-                      }
+                     }
+        bgfilterargs = {'energy': [300, 3000],
+                        'circle': (self.source['bg_x'], self.source['bg_y'],
+                                 5 * self.source['r'])
+        }
 
         evt2file = self.get_data_file('evt2')
 
@@ -418,7 +432,7 @@ The put those numbers into perspective: If I used the |marx| simulation to deter
                                     [[evt2file, 'marx_only.fits', 'marx_saotrace.fits'],
                                      ['obs_rand.fits', 'marx_only_rand.fits', 'marx_saotrace_rand.fits']],
                                     ['EDSER', 'RANDOMIZE']):
-            err_marx, err_sao = plot_ecf(ax, files, filterargs)
+            err_marx, err_sao = plot_ecf(ax, files, filterargs, bgfilterargs)
 
             ax.set_title(title)
 
@@ -445,7 +459,9 @@ class ACISIPSF(ACISSPSF):
 
     source = {'x': 4140,
               'y': 4102,
-              'r': 4}
+              'r': 4,
+              'bg_x': 4182,
+              'bg_y': 4127}
 
 
 class OffAxisPSF(HRCIPSF):
