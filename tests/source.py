@@ -102,7 +102,7 @@ class ImageSource(base.MarxTest):
 
         # Create a new WCS object.
         w = WCS(naxis=2)
-        w.wcs.crpix = [-234.75, 8.3393]
+        w.wcs.crpix = [100., 100.]
         # Pixel size of our image shall be 1 arcsec
         w.wcs.cdelt = [1. / 3600., 1. / 3600.]
         w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
@@ -124,7 +124,7 @@ class ImageSource(base.MarxTest):
         We run a monoenergetic simulation here for the Si XIII line at 6.65 Ang.
         '''
         return {'SourceType': "IMAGE", 'S-ImageFile': 'input_image.fits',
-                'MinEnergy': 1.9, 'MaxEnergy': 1.9,
+                'MinEnergy': 1.9, 'MaxEnergy': 1.9, 'GratingType': 'NONE',
                 'OutputDir': 'image'}
 
     @base.Marx2fits
