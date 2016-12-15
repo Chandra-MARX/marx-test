@@ -78,7 +78,7 @@ def write_summary_rst(conffile):
         f.write(codeindex.render(codelist=codelist))
 
 
-def run_and_output(conffile, run=True, modules=None, tests=None):
+def run_and_output(conffile, run=True, modules=None, tests=None, debug=False):
     '''Run tests and output results.
 
     Parameters
@@ -96,6 +96,8 @@ def run_and_output(conffile, run=True, modules=None, tests=None):
     tests : list of strings or None
         If set, only tests with a name listed in ``tests`` will be run and
         generate rst output. Can be used in combination with ``modules``.
+    debug : bool
+        If ``True``, print out the source code of every step when it is run.
     '''
     conf, outpath, jinjaenv, modulelist = setup_env(conffile)
     testlisttemp = jinjaenv.get_template('testlist.rst')
@@ -117,7 +119,7 @@ def run_and_output(conffile, run=True, modules=None, tests=None):
             testclass = getattr(imp_module, t)
             testinst = testclass(conf)
             if run:
-                testinst.run()
+                testinst.run(debug=debug)
             t_list.append(testinst)
             with open(pjoin(outpath, 'code', t + '.rst'), 'w') as f:
                 f.write(codetemp.render(testinst=testinst))

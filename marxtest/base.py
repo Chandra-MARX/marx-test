@@ -448,16 +448,27 @@ class MarxTest(object):
         steplist.sort(key=lambda s: int(s.split('_')[1]))
         return [getattr(self, s) for s in steplist]
 
-    def run(self):
-        '''Setup test, make output directories and run all steps.'''
+    def run(self, debug=False):
+        '''Setup test, make output directories and run all steps.
+
+        Parameters
+        ----------
+        debug : bool
+            If ``True``, print out the source code of every step.
+        '''
         self.pkg_data = os.path.join(self.conf.get('tests', 'path'),
                                      self.conf.get('tests', 'modulename'),
                                      'data')
         if not os.path.exists(self.outpath):
                 os.makedirs(self.outpath)
 
-        with ChangeDir(self.basepath):
-            for step in self.steplist:
+        for step in self.steplist:
+            if debug:
+                print('Running {0}: {1}'.format(step.im_class, step.__func__.__name__))
+                print(step.source())
+            # Running (but not the source display in the line above!)
+            # must be done in the execution directory.
+            with ChangeDir(self.basepath):
                 step(self.conf)
 
     def get_data_file(self, filetype, download=True):
