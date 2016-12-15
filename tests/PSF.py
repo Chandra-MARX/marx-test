@@ -22,6 +22,7 @@ from marxtest.process_utils import (marxpars_from_asol,
 from marxtest import plot_utils
 
 tests = ['ACISSPSF', 'ACISIPSF', 'HRCIPSF', 'OffAxisPSF',
+         #'Wings',
          'CompMARXSAOTraceenergies', 'CompMARXSAOTraceoffaxis']
 
 title = 'Point Spread Function (PSF)'
@@ -53,7 +54,7 @@ def plot_ecf(ax, files, filterargs, bgfilterargs):
         the two would be 8/9=0.88, meaning that all fluxes extracted using
         this radius are 12 % too small.
     err_sao: float
-        Same for the simulation that used SA)Trace + MARX.
+        Same for the simulation that used SAOTrace + MARX.
     '''
     # In this energy range we have the most counts and we limited
     # the simulations to the same range.
@@ -207,7 +208,7 @@ class HRCIPSF(base.MarxTest):
         Since the HRC has no intrisinc energy resolution, the source spectrum
         can not be taken from the observed data. Instead, we fitted a model
         to a grating spectrum of the same source and saved that model
-        spectrum to a file. AR Lac is knows to be time variable and show
+        spectrum to a file. AR Lac is known to be time variable and to show
         stellar flares, so this spectrum is only an approximation, but it
         is the best we can do here.
 
@@ -225,7 +226,7 @@ class HRCIPSF(base.MarxTest):
         '''Set marx parameters appropriate for observation'''
         asol = self.get_data_file('asol')
         evt = self.get_data_file('evt2')
-        pars = marxpars_from_asol(asol, evt)
+        pars = marxpars_from_asol(self.conf, asol, evt)
         pars['SpectrumType'] = 'FILE'
         pars['SpectrumFile'] = 'input_spec_marx.tbl'
         pars['OutputDir'] = 'marx_only'
@@ -287,7 +288,7 @@ point{{ position = {{ ra = {ra},
         '''Run |marx| with `SAOTrace`_ ray file as input'''
         asol = self.get_data_file('asol')
         evt = self.get_data_file('evt2')
-        pars = marxpars_from_asol(asol, evt)
+        pars = marxpars_from_asol(self.conf, asol, evt)
         pars['SpectrumType'] = 'FILE'
         pars['SpectrumFile'] = 'input_spec_marx.tbl'
         pars['OutputDir'] = 'marx_saotrace'
@@ -298,7 +299,7 @@ point{{ position = {{ ra = {ra},
 
     @base.Marx2fits
     def step_6(self):
-        '''Same settings as the marx2fits ron above'''
+        '''Same settings as the marx2fits run above'''
         return ('--pixadj=NONE', 'marx_saotrace', 'marx_saotrace.fits')
 
     @base.Python
@@ -369,6 +370,7 @@ The put those numbers into perspective: If I used the |marx| simulation to deter
     input for |marx| and `SAOTrace`_ runs.
     x,y,r are given in "physical" pixel units on the detector.
     '''
+
     @base.Ciao
     def step_0(self):
         '''Obtain spectrum from observed data'''
@@ -515,6 +517,219 @@ simplification that the |marx| mirror model makes.'''
     def step_20(self):
         '''ds9 images of the PSF'''
         return ['''ds9 -width 800 -height 500 -log -cmap heat {0} marx_only.fits marx_saotrace.fits -pan to 5256 6890 physical -bin about 5256 6890 -match frame wcs -match bin -frame 1 -regions command 'text 5:39:27.987 -69:43:52.31 # text=Observation font="helvetica 24"' -frame 2 -regions command 'text 5:39:27.987 -69:43:52.31 # text="only MARX" font="helvetica 24"' -frame 3 -regions command 'text 5:39:27.987 -69:43:52.31 # text=SAOTrace font="helvetica 24"' -regions command 'text 5:39:26.691 -69:44:09.93 # text="+ MARX" font="helvetica 24"' -saveimage {1} -exit'''.format(self.get_data_file('evt2'), self.figpath(self.figures.keys()[0]))]
+
+
+class Wings(HRCIPSF):
+    '''The Chandra PSF falls in two regimes: The shape of the core is set by quasi-specular
+    reflection from low-frequency surface errors. This component is strongly peaked and dominates
+    in the innermost few arcseconds (for and on-axis source). The out part of the PSF has the shape of a powerlaw with an spectral index close to two and is caused by micro-roughness on the mirror surfaces. The `Proposer's Observatory Guide <http://cxc.harvard.edu/proposer/POG/html/chap4.html#tth_sEc4.2.3>`_ and `a memo by T.J. Gaetz <http://cxc.harvard.edu/cal/Hrma/rsrc/Publish/Optics/PSFWings/wing_analysis_rev1b.pdf>`_ discuss this in a lot more detail. The memo is based on a very detailed analysis of a deep Her-X1 observation. In this test we replicate that observation in |marx| and `SAOTrace`_ simulations.
+
+    In the memo, T.J. Gaetz goes to great lengths to separate the effect of the intrinsic Chandra PSF on the data from other influences such as the ACIS contamination. When we compare data and |marx| simulation below, we chose a somewhat simpler approach. We perform steps to mitigate the impact of other astrophysical sources (which are not part of the |marx| simulation) and background (which is not part of the |marx| simulation). On the other hand, we just compare the observed count rates with no correction for the ACIS contamination, dithering near chip edges etc. because those effects are included in both the observed and the simulated data.
+
+    Read the code for this test to see all details of the data extraction, but here are the most
+    important points:
+
+    - The source is heavily piled-up, thus the source spectrum is taken from the read-out streak.
+    '''
+
+    title = 'Wings of the Chandra PSF'
+    obsid = 3662
+    download_all = False
+
+    figures = OrderedDict([('ECF', {'alternative': 'TBD',
+                                    'caption': 'Enclosed count fraction for observation and simulations.'})
+                       ])
+
+    summary = '''TBD'''
+
+    source = {'x': 4174,
+              'y': 4043}
+    '''Source position.
+
+    This is used to automatically extract a source spectrum that can be used as
+    input for |marx| and `SAOTrace`_ runs.
+    x,y,r are given in "physical" pixel units on the detector.
+    '''
+
+    source_reg = 'rotbox(3922.6168,3556.9146,12,512,332.71498)'
+    '''Source is heavily piled-up so we extract the source spectrum from the read-out streak.'''
+
+    expresults = [{'name': 'marx90', 'title': 'Flux err (MARX)',
+                   'description': 'Flux error if the MARX simulated PSF is assumed to be right. This is calculated as follows: We find the radius that encircles 90% of all counts in the MARX simulation. Then, we extract the observed counts using that radius. If the simulation is correct, that radius should contain 90% of the observed counts, too. If, e.g. the simulated radius is too small, we may extract only 80 % of the counts. The ratio between the two would be 8/9=0.88, meaning that all fluxes extracted using this radius are 12 % too small.',
+                   'value': 0},
+                  {'name': 'saotrace90', 'title': 'Fluxerr(SAOTr+MARX)',
+                   'description': 'Same, but using a model of SAOTrace + MARX',
+                   'value': 1}]
+
+    energy_bins = np.array([.4, .5, .6, .7, .9, 1., 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.,
+                    3.5, 4., 4.5, 5., 5.5, 6., 6.5, 7., 7.5, 8.])
+    '''The analysis makes narrow band count rate images.
+    Bands are defined here. If they are too wide, then the effective area and spectrum
+    within one band cannot be taken as constant any longer, but if they are too narrow
+    the test will need a very long time to run.
+    '''
+
+    @base.Ciao
+    def step_0(self):
+        '''Obtain spectrum from observed data'''
+        asolfile = self.get_data_file('asol')
+        evtfile = self.get_data_file('evt2')
+        commands = spectrum_from_fluxcorrection(self.conf,
+                                                asolfile, evtfile,
+                                                self.source['x'],
+                                                self.source['y'],
+                                                self.source_reg,
+                                                # Rough estimate of normalization
+                                                # Read-out streak region is 512 pix long
+                                                0.00004*512/3.2)
+        return commands
+
+    @base.Marx2fits
+    def step_2(self):
+        '''Use the EDSER subpixel algorithm'''
+        return ('--pixadj=EDSER', 'marx_only', 'marx_only.fits')
+
+    @base.Marx2fits
+    def step_6(self):
+        '''Same setting as above for comparison'''
+        return ('--pixadj=EDSER', 'marx_saotrace', 'marx_saotrace.fits')
+
+    @base.Ciao
+    def step_14(self):
+        '''Make image and run cell detect to find exclusion regions for extraction.'''
+        evtfile = self.get_data_file('evt2')
+        asolfile = self.get_data_file('asol')
+        return ['dmcopy "{0}[bin x=3700:4300:1,y=3700:4300:1][opt type=i4]" im.fits option=image clobber=yes'.format(evtfile),
+               'celldetect im.fits im_src.fits clobber=yes',
+               'asphist {0} asphist_7.fits evtfile="{1}[ccd_id=7]" clobber=yes'.format(asolfile, evtfile)
+               ]
+
+    @base.Ciao
+    def step_15(self):
+        '''Create exposure maps
+
+        Also, make exposure map for S-3 chip to correct for dither etc. Mirror effective
+        area is not included in that calculation, because all the photons we care for come
+        from the same source, not from different positions on the sky, thus the mirror
+        effective area is the constant for the source we look at.
+
+        The instrument map depends strongly on the energy. We will thus pass in the
+        source spectrum. This gives us one map appropriately scaled for the whole spectrum.
+        However, in later analysis, we want to split the data in narrower bands.
+        When looking at that accurately, we need to have one map for each band.
+
+        Also, the observed data contains bad pixels, while the marx simulated data does not.
+        This means that we need to make a second set of maps with no bad pixels in them.
+        '''
+        evtfile = self.get_data_file('evt2')
+        out = []
+        for i in range(len(self.energy_bins) - 1):
+            e = self.energy_bins[i]
+            e_mid = 0.5 * (self.energy_bins[i] + self.energy_bins[i + 1])
+            for name, bpix in zip(['', '_marx'], ['', ';BPMASK=0x00000']):
+                out.append('mkinstmap instmap{4}{1}.fits monoenergy={3} pixelgrid="1:1024:#1024,1:1024:#1024" obsfile="{0}[EVENTS]" dafile=NONE detsubsys="ACIS-S3{2}" mirror="HRMA;AREA=1" grating=NONE maskfile=NONE spectrumfil=NONE clobber=yes'.format(evtfile, name, bpix, e_mid, '_{0:3.1f}'.format(e)))
+                out.append('mkexpmap asphist_7.fits expmap{1}{0}.fits instmap{1}{0}.fits xygrid="2975:4400:#512,3250:4650:#512" clobber=yes useavgaspect=no'.format(name, '_{0:3.1f}'.format(e)))
+
+        return out
+
+    @base.Python
+    def step_16(self):
+        '''Clean bogus sources from src file and write regions
+
+        celldetect always detects plenty of sources on the read-out streak and
+        around the piled-up regions.
+        For processing speed and clarity we want to remove those bogus detections
+        from the source list.
+        '''
+        import numpy as np
+        from astropy.table import Table
+        src = Table.read(os.path.join(self.basepath, 'im_src.fits'), hdu=1)
+        # Get sources within 50 pix of Her X-1. We don't look there anyway because of pile-up
+        src['d_herx1'] = np.sqrt((src['X'] - self.source['x'])**2 +
+                                 (src['Y'] - self.source['y'])**2)
+        d_src = src['d_herx1'] < 50.
+        # Get sources on the read-out streak
+        # 2 points on streak
+        p1 = np.array([3772., 3264.])
+        p2 = np.array([4251., 4193.])
+        # n is normal to read-out streak
+        n = np.array([1., - (p2[0] - p1[0]) / (p2[1] - p1[1])])
+        n = n / np.linalg.norm(n)
+        x = np.vstack([src['X'], src['Y']])
+        d_line = np.abs(np.dot(n, (p1 - x.T).T)) < 2.
+        src = src[~d_src & ~d_line]
+
+        # box for readout streak
+        streak = 'rotbox(4010.0285,3725.3416,18.240189,1085.0354,332.74569)'
+        # Assemble regions for extraction:
+        n_rings = 50
+        r_rings = np.logspace(np.log10(7.), np.log10(500.), n_rings + 1) / 0.492
+        with open(os.path.join(self.basepath, 'annuli.stk'), 'w') as f:
+            for i in range(n_rings):
+                reg = 'annulus({0}, {1}, {2}, {3})'.format(self.source['x'], self.source['y'],
+                                                           r_rings[i], r_rings[i + 1])
+                reg += '-' + streak
+                # find sources that overlap this ring
+                ind1 = src['d_herx1'] + src['R'][:, 0] > r_rings[i]
+                ind2 = src['d_herx1'] - src['R'][:, 0] < r_rings[i + 1]
+                src_intersect = src[ind1 & ind2]
+                for s in src_intersect:
+                    reg += '-ellipse({0}, {1}, {2}, {3}, {4})'.format(s['X'], s['Y'],
+                                                                        s['R'][0], s['R'][1],
+                                                                        s['ROTANG'])
+                f.write(reg + '\n')
+
+    @base.Ciao
+    def step_17(self):
+        '''Extract data in energy bins'''
+        evtfile = self.get_data_file('evt2')
+
+        out = []
+        for efile, name, outname in zip([evtfile, 'marx_only.fits', 'marx_saotrace.fits'],
+                                        ['', '_marx', '_marx'],
+                                        ['_obs', '_marx', '_saotrace']):
+            for i in range(len(self.energy_bins) - 1):
+                e = self.energy_bins[i]
+                e_upper = self.energy_bins[i + 1]
+                # Energy in fits file in in eV not, keV, thus a factor of 1000 here
+                out.append('dmextract "{efile}[energy={elower}:{eupper}][bin sky=@annuli.stk]" profile{estr}{outname}.fits exp=expmap{estr}{name}.fits opt=generic2 clobber=yes'.format(efile=efile, elower=e*1000, eupper=e_upper*1000, estr='_{0:3.1f}'.format(e), name=name, outname=outname))
+        return out
+
+    @base.Python
+    def step_20(self):
+        '''Analyze and plot results'''
+        import os
+        import numpy as np
+        from matplotlib import pyplot as plt
+        from astropy.table import Table
+        from astropy.modeling import models, fitting
+
+        fig = plt.figure()
+        axecf = fig.add_subplot(111)
+
+        r = np.mean(tab['R'], axis=1)
+        r_arcsec = r * 0.492
+        indfit = r > 15.
+        plt.errorbar(r_arcsec, tab['SUR_FLUX'], xerr=np.diff(r_arcsec)/2, yerr=tab['SUR_FLUX_ERR'])
+
+        fig.savefig(self.figpath(''))
+
+        # start with reasonable guesses
+        powconst = models.PowerLaw1D + models.Const1D
+
+
+        fit_g = fitting.LevMarLSQFitter()
+        for i in range(len(self.energy_bins) - 1):
+            e = self.energy_bins[i]
+            e_mid = 0.5 * (self.energy_bins[i] + self.energy_bins[i + 1])
+            for j, name in enumerate(['obs', 'marx', 'saotrace']):
+                tab = Table.read('profile_{0:3.1f}_{1}.fits'.format(e, name))
+                r = np.mean(tab['R'], axis=1)
+                r_arcsec = r * 0.492
+                indfit = r > 15.
+
+                mymod = powconst(amplitude_1=tab['SUR_FLUX'][-1], bounds={'amplitude_1': [0, None]})
+                g = fit_g(mymod, r[indfit], tab['SUR_FLUX'][indfit])
 
 
 class CompMARXSAOTraceenergies(base.MarxTest):

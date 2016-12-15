@@ -1,10 +1,13 @@
+import os
 from warnings import warn
 import subprocess
 from collections import OrderedDict
 
+import numpy as np
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy.coordinates.name_resolve import NameResolveError
+from astropy.table import Table
 
 
 def detectorfromkeyword(keyword):
@@ -66,7 +69,7 @@ def target_coos_from_asol(asolfile):
         return asol['RA_NOM'], asol['DEC_NOM']
 
 
-def marxpars_from_asol(asolfile, evt2file):
+def marxpars_from_asol(conf, asolfile, evt2file):
     '''Set MARX parameters from asol and evt file.
 
     This function parses the header of a fits file and uses the
@@ -74,6 +77,9 @@ def marxpars_from_asol(asolfile, evt2file):
 
     Parameters
     ----------
+    conf : `~ConfigParser.ConfigParser` instance
+        The configuration file contains the initialization code for CIAO.
+
     asolfile : string
         Path and name of an asol file
 
@@ -111,9 +117,16 @@ def marxpars_from_asol(asolfile, evt2file):
     det = detectorfromkeyword(evt['DETNAM'])
     if det != '':
         marx_pars['DetectorType'] = det
+        # Find offsets from nominal pointing
+        aimpts = Table.read(os.path.join(conf.get('marx', 'path'), 'share', 'marx', 'data', 'caldb', 'telD1999-07-23aimptsN0002.fits'))
+        det2aimpts = {'ACIS-I': 'AI2', 'ACIS-S': 'AS1', 'HRC-I': 'HI1', 'HRC-S': 'HS1'}
+        aimp = np.array([n.strip() for n in aimpts['AIMPOINT_NAME']])
+        ind = aimp == det2aimpts[det]
+        marx_pars['DetOffsetX'] = evt['SIM_X'] - aimpts[ind]['AIMPOINT'][0][0]
+        # No Y offset possible
+        marx_pars['DetOffsetZ'] = evt['SIM_Z'] - aimpts[ind]['AIMPOINT'][0][2]
     else:
-        warn('detector {0} not understood. No DetectorType set.'.format(asol['DETNAM']))
-
+        warn('detector {0} not understood. No DetectorType or aimpoint offset set.'.format(asol['DETNAM']))
     return marx_pars
 
 

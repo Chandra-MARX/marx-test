@@ -28,7 +28,7 @@ from collections import OrderedDict
 
 from marxtest import base
 
-tests = ['SpectrumAbsPowACISS', 'SpectrumAbsPowACISS_offaxis'
+tests = ['SpectrumAbsPowACISS', 'SpectrumAbsPowACISS_offaxis',
          'SpectrumAPECACISI']
 
 title = 'Reproducing an input spectrum'

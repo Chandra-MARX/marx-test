@@ -91,7 +91,7 @@ In this particular case, there is very little source signal above 2 keV, so the 
         '''Run in energy band, match observational setup'''
         asol = self.get_data_file('asol')
         evt2 = self.get_data_file('evt2')
-        pars = marxpars_from_asol(asol, evt2)
+        pars = marxpars_from_asol(self.conf, asol, evt2)
         pars['MinEnergy'] = 0.3
         pars['MaxEnergy'] = 2.0
         return pars
@@ -134,7 +134,7 @@ class ACIS_FI(ACIS_BI_low_energy):
         '''Run in energy band, match observational setup'''
         asol = self.get_data_file('asol')
         evt2 = self.get_data_file('evt2')
-        pars = marxpars_from_asol(asol, evt2)
+        pars = marxpars_from_asol(self.conf, asol, evt2)
         pars['MinEnergy'] = 2.
         pars['MaxEnergy'] = 4.
         return pars
