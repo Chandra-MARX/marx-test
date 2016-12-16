@@ -22,7 +22,7 @@ from marxtest.process_utils import (marxpars_from_asol,
 from marxtest import plot_utils
 
 tests = ['ACISSPSF', 'ACISIPSF', 'HRCIPSF', 'OffAxisPSF',
-         #'Wings',
+         'Wings',
          'CompMARXSAOTraceenergies', 'CompMARXSAOTraceoffaxis']
 
 title = 'Point Spread Function (PSF)'
@@ -63,17 +63,17 @@ def plot_ecf(ax, files, filterargs, bgfilterargs):
     r_obs = radial_distribution(obs['x'], obs['y'])
     r_obs.sort()
     ax.plot(r_obs, np.linspace(0, 1 + len(bkg) / len(r_obs), len(r_obs)),
-            'k', lw=3, label='Observation')
+            label='Observation')
 
     simmarx = filter_events(Table.read(files[1]), **filterargs)
     r_marx = radial_distribution(simmarx['X'], simmarx['Y'])
     r_marx.sort()
-    ax.plot(r_marx, np.linspace(0, 1, len(r_marx)), 'r', lw=3, label='MARX')
+    ax.plot(r_marx, np.linspace(0, 1, len(r_marx)), label='MARX')
 
     simsao = filter_events(Table.read(files[2]), **filterargs)
     r_sao = radial_distribution(simsao['X'], simsao['Y'])
     r_sao.sort()
-    ax.plot(r_sao, np.linspace(0, 1, len(r_sao)), 'b', lw=3, label='SAOTrace + MARX')
+    ax.plot(r_sao, np.linspace(0, 1, len(r_sao)), label='SAOTrace + MARX')
 
     ax.set_xscale('power', power=0.5)
     ax.set_xlabel('radius [pixel]')
@@ -82,7 +82,6 @@ def plot_ecf(ax, files, filterargs, bgfilterargs):
     ax.set_xticks([.1, .4, .7, 1, 2, 3, 4, 5])
     ax.set_xlim([0.1, 5])
     ax.set_ylim([0, 1.])
-    ax.grid()
 
     psf90_marx = np.percentile(r_marx, 90)
     ecf_at_that_rad = np.argmin(np.abs(r_obs - psf90_marx)) / len(r_obs)
@@ -317,7 +316,7 @@ point{{ position = {{ ra = {ra},
         evt2file = self.get_data_file('evt2')
         files = [evt2file, 'marx_only.fits', 'marx_saotrace.fits']
 
-        fig = plt.figure(figsize=(10, 5))
+        fig = plt.figure()
         ax = fig.add_subplot(111)
 
         err_marx, err_sao = plot_ecf(ax, files, filterargs, bgfilterargs)
@@ -426,7 +425,7 @@ The put those numbers into perspective: If I used the |marx| simulation to deter
 
         evt2file = self.get_data_file('evt2')
 
-        fig = plt.figure(figsize=(10, 5))
+        fig = plt.figure()
         ax1 = fig.add_subplot(121)
         ax2 = fig.add_subplot(122)
 
@@ -530,17 +529,20 @@ class Wings(HRCIPSF):
     important points:
 
     - The source is heavily piled-up, thus the source spectrum is taken from the read-out streak.
+    - Because of pile-up in the data, all fitting is restricted to radii above 15 arcsec.
     '''
 
     title = 'Wings of the Chandra PSF'
     obsid = 3662
-    download_all = False
+    download_all = True
 
-    figures = OrderedDict([('ECF', {'alternative': 'TBD',
-                                    'caption': 'Enclosed count fraction for observation and simulations.'})
+    figures = OrderedDict([('PowerLaws', {'alternative': 'Four plots show that the flux in the scattering halo drops as a powerlaw with increasing distance from the source. See text for a comparison of data and observations.',
+                                          'caption': "The flux in the scattering halo drops as a powerlaw with increasing distance from the source. The plots show the data (with purely statistical uncertainties) and powerlaw fits. Due to the background that is part of the observations but not the simulated data, the powerlaw flattens out for the observed data in some cases. We add a constant to the model to account for this. `SAOTrace`_ simulations produce a fairly smooth powerlaw similar to the observations. The pure |marx| simulations have much larger deviations due to |marx|'s simplified mirror model."}),
+                           ('PowerSlope', {'alternative': 'See caption and summary text for a description.',
+                                    'caption': 'The surface brightness falls off with increasing distance from the source position as a powerlaw. The exponent of this powerlaw depends on the photon energy as shown in the figure. If spectra are extracted in the scattering halo the observed spectrum will thus change with distance from the source. For the observed data, the low energy end (below about 1 keV) has to be taken with a grain of salt. We applied a correction for the ACIS contamination in the data reduction, but the distribution of the contaminant over the detector area is not well known, leading to systematic uncertainties. For energies above 5 keV, the outer mirror shell does not contribute much effective area any longer. This shell has the roughest surface, which explains why we observe steeper powerlaw slopes for higher eneergies. Both the |marx| and the `SAOTrace` mirror model also have energy dependent exponents.'})
                        ])
 
-    summary = '''TBD'''
+    summary = '''Both |marx| and `SAOTrace`_ implement a mirror model that has wide scattering wings which are also seen in actual Chandra data. These wings can be traced out to at least 8 arcmin. On the other hand, these scattering wings are very weak (the flux per surface area drops by about four orders of magnitute between 10 arcsec and 500 arcsec for an on-axis source) and thus they are not not relevant in any but the very brightest objects. The `SAOTrace` mirror model produces a smoother distribution that is more similar to the observed data tan |marx|. In both mirror models the slope depends on the energy. `SAOTrace`_ reproduces the shape of the observed data very well, but the exponent is significantly too steep everywhere. Thus, spectra extracted in the halo will be compatible with observed data, but the flux in the simulation will be too low. On the other hand, |marx| produces more realistic exponents above 1 keV, so it will match the observed surface brightness better, but not the spectral properties. '''
 
     source = {'x': 4174,
               'y': 4043}
@@ -697,39 +699,96 @@ class Wings(HRCIPSF):
 
     @base.Python
     def step_20(self):
-        '''Analyze and plot results'''
-        import os
+        '''Analyze and plot results - Plot 1'''
         import numpy as np
         from matplotlib import pyplot as plt
         from astropy.table import Table
-        from astropy.modeling import models, fitting
-
-        fig = plt.figure()
-        axecf = fig.add_subplot(111)
-
-        r = np.mean(tab['R'], axis=1)
-        r_arcsec = r * 0.492
-        indfit = r > 15.
-        plt.errorbar(r_arcsec, tab['SUR_FLUX'], xerr=np.diff(r_arcsec)/2, yerr=tab['SUR_FLUX_ERR'])
-
-        fig.savefig(self.figpath(''))
-
-        # start with reasonable guesses
+        from astropy.modeling import models
+        import saba
         powconst = models.PowerLaw1D + models.Const1D
+        fit_g = saba.SherpaFitter(statistic='chi2', optimizer='levmar')
 
-
-        fit_g = fitting.LevMarLSQFitter()
-        for i in range(len(self.energy_bins) - 1):
-            e = self.energy_bins[i]
-            e_mid = 0.5 * (self.energy_bins[i] + self.energy_bins[i + 1])
+        fig = plt.figure(figsize=(10, 8))
+        energy_index = [1, 8, 18, 24]
+        fullname = {'obs': 'Observation', 'marx': 'MARX',
+                    'saotrace': 'SAOTrace + MARX'}
+        for i in range(len(energy_index)):
+            e = self.energy_bins[energy_index[i]]
+            e_upper = self.energy_bins[energy_index[i] + 1]
+            ax = fig.add_subplot(2, 2, i + 1)
             for j, name in enumerate(['obs', 'marx', 'saotrace']):
                 tab = Table.read('profile_{0:3.1f}_{1}.fits'.format(e, name))
                 r = np.mean(tab['R'], axis=1)
                 r_arcsec = r * 0.492
-                indfit = r > 15.
+                indfit = r_arcsec > 15.
+                plots = ax.errorbar(r_arcsec, tab['SUR_FLUX'],
+                                    yerr=tab['SUR_FLUX_ERR'],
+                                    label='__no_legend__')
 
-                mymod = powconst(amplitude_1=tab['SUR_FLUX'][-1], bounds={'amplitude_1': [0, None]})
-                g = fit_g(mymod, r[indfit], tab['SUR_FLUX'][indfit])
+                if name == 'obs':
+                    mymod = powconst(amplitude_1=tab['SUR_FLUX'][-1],
+                                     bounds={'amplitude_1': (0, None)})
+                else:
+                    mymod = models.PowerLaw1D()
+                # Multiply data values with 1e6 for numerical stability
+                g = fit_g(mymod, r[indfit], tab['SUR_FLUX'][indfit] * 1e6,
+                          err=tab['SUR_FLUX_ERR'][indfit] * 1e6)
+                ax.plot(r_arcsec, g(r) / 1e6, label=fullname[name],
+                        color=plots[0].get_color())
+                ax.set_title('{0:3.1f} - {1:3.1f} keV'.format(e, e_upper))
+                ax.loglog()
+                ax.set_xlim(6, 550)
+                if i in [0, 2]:
+                    ax.set_ylabel('flux per area')
+                if i in [2, 3]:
+                    ax.set_xlabel('radius [arcsec]')
+
+        ax.legend(fontsize='small', loc='lower left')
+        #fig.subplots_adjust(top=.95, right=.99, wspace=.2, hspace=.25)
+        fig.savefig(self.figpath(self.figures.keys()[0]))
+
+    @base.Python
+    def step_21(self):
+        '''Analyze and plot results - Plot 2'''
+        import numpy as np
+        from matplotlib import pyplot as plt
+        from astropy.table import Table
+        from astropy.modeling import models, fitting
+        import saba
+
+        powconst = models.PowerLaw1D + models.Const1D
+        fit_g = saba.SherpaFitter(statistic='chi2', optimizer='levmar')
+        slopes = np.zeros((len(self.energy_bins) - 1, 3))
+        for i in range(len(self.energy_bins) - 1):
+            e = self.energy_bins[i]
+            for j, name in enumerate(['obs', 'marx', 'saotrace']):
+                tab = Table.read('profile_{0:3.1f}_{1}.fits'.format(e, name))
+                r = np.mean(tab['R'], axis=1)
+                r_arcsec = r * 0.492
+                indfit = r_arcsec > 15.
+                if name == 'obs':
+                    mymod = powconst(amplitude_1=tab['SUR_FLUX'][-1],
+                                     bounds={'amplitude_1': (0, None)})
+                else:
+                    mymod = models.PowerLaw1D()
+                # Multiply data values with 1e6 for numerical stability
+                g = fit_g(mymod, r[indfit], tab['SUR_FLUX'][indfit] * 1e6,
+                          err=tab['SUR_FLUX_ERR'][indfit] * 1e6)
+                if name == 'obs':
+                    slopes[i, j] = g.alpha_0.value
+                else:
+                    slopes[i, j] = g.alpha.value
+                print g
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        e_mid = 0.5 * (self.energy_bins[:-1] + self.energy_bins[1:])
+        for i, name in enumerate(['Observation', 'MARX', 'SAOTrace + MARX']):
+            ax.plot(e_mid, slopes[:, i], label=name)
+            ax.legend()
+            ax.set_xlabel('energy [keV]')
+            ax.set_ylabel('slope of powerlaw')
+        fig.savefig(self.figpath(self.figures.keys()[1]))
 
 
 class CompMARXSAOTraceenergies(base.MarxTest):
@@ -859,7 +918,7 @@ class CompMARXSAOTraceenergies(base.MarxTest):
                 # The old question: Is an index the center of a pixel of the corner?
                 # Differs by 0.5...
                 d_ra = (tab['X'] - tab.meta['TCRPX9'] - 0.5) * tab.meta['TCDLT9'] * 3600.
-                # And do I count fro mthe left or right (RA is reversed on the sky)?
+                # And do I count from the left or right (RA is reversed on the sky)?
                 d_dec = (tab['Y'] - tab.meta['TCRPX10'] + 0.5) * tab.meta['TCDLT10'] * 3600.
 
                 if prog == 'marx':
@@ -910,7 +969,7 @@ class CompMARXSAOTraceenergies(base.MarxTest):
 
         fig = plt.figure()
         axecf = fig.add_subplot(111)
-        color = plt.cm.jet(np.linspace(0, 1, len(self.parameter)))
+        color = plt.cm.jet_r(np.linspace(0, 1, len(self.parameter)))
         for i, e in enumerate(self.parameter):
 
             for prog in ['marx', 'saomarx']:
@@ -930,15 +989,15 @@ class CompMARXSAOTraceenergies(base.MarxTest):
                 bin_mid_marx = 0.5 * (edges[:-1] + edges[1:])
                 ecf_marx = 1.0 * val.cumsum() / val.sum()
                 if prog == 'marx':
-                    axecf.plot(bin_mid_marx, ecf_marx, color=color[i], lw=2, label='{0} keV'.format(e))
+                    line, = axecf.plot(bin_mid_marx, ecf_marx, color=color[i],
+                                       label='{0} keV'.format(e))
                 else:
-                    axecf.plot(bin_mid_marx, ecf_marx, color=color[i], lw=2, ls=':')
+                    axecf.plot(bin_mid_marx, ecf_marx, color=line.get_color(), ls=':')
         axecf.set_xscale('power', power=0.5)
         axecf.legend(loc='lower right')
         axecf.set_ylabel('encircled count fraction')
         axecf.set_xlabel('radius [arcsec]')
         axecf.set_xticks([0, .1, .2, .4, .6, .8, 1, 2, 3, 4, 5])
-        axecf.grid()
         fig.savefig(self.figpath('ECF'))
 
 
@@ -1015,7 +1074,6 @@ class CompMARXSAOTraceoffaxis(CompMARXSAOTraceenergies):
         ecf = [0.5, 0.7, 0.9]
         fig = plt.figure()
         axecf = fig.add_subplot(111)
-        color = plt.cm.viridis(np.linspace(0, 1, len(ecf)))
         out = np.zeros((len(self.parameter), 2, len(ecf)))
 
         for i, e in enumerate(self.parameter):
@@ -1040,8 +1098,10 @@ class CompMARXSAOTraceoffaxis(CompMARXSAOTraceenergies):
                 out[i, j, :] = np.percentile(r, np.array(ecf) * 100.)
 
         for i, e in enumerate(ecf):
-            axecf.plot(self.parameter, out[:, 0, i], color=color[i], lw=2, label='{0} %'.format(e*100))
-            axecf.plot(self.parameter, out[:, 1, i], color=color[i], lw=2, ls=':')
+            line, = axecf.plot(self.parameter, out[:, 0, i],
+                               label='{0} %'.format(e*100))
+            axecf.plot(self.parameter, out[:, 1, i], color=line.get_color(),
+                       ls=':')
         axecf.legend(loc='lower right')
         axecf.set_ylabel('radius [arcsec]')
         axecf.set_xlabel('off-axis angle [arcmin]')
