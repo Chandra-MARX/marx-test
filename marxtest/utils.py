@@ -102,7 +102,8 @@ def _name_matches(name, products):
 def _copy_into_dir(host, t_dir, products):
     '''copy products from current host dir into t_dir
 
-    Unzip all file ending on gz
+    Unzip all files ending on .gz. This routine skips files that already exist
+    in the target directory with the same filename.
     '''
     names = host.listdir(host.curdir)
     for name in names:
@@ -111,15 +112,20 @@ def _copy_into_dir(host, t_dir, products):
                 os.makedirs(t_dir)
             # Remote name, local name, binary mode
             outname = os.path.join(t_dir, name)
-            host.download(name, outname)
-            if name[-3:] == '.gz':
-                with gzip.open(outname, 'rb') as f_in, open(outname[:-3], 'wb') as f_out:
-                    shutil.copyfileobj(f_in, f_out)
-                os.remove(outname)
+            if not os.path.exists(outname[:-3]):
+                host.download(name, outname)
+                if name[-3:] == '.gz':
+                    with gzip.open(outname, 'rb') as f_in, open(outname[:-3], 'wb') as f_out:
+                        shutil.copyfileobj(f_in, f_out)
+                    os.remove(outname)
 
 
 def download_chandra(obsid, targetdir, products=None):
-    '''Download Chandra data
+    '''Download Chandra data.
+
+    Files are retrieved from the Chandra ftp archive and unzipped.
+    This routine skips files that already exist
+    in the target directory with the same filename.
 
     Parameters
     ----------
