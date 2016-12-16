@@ -47,7 +47,7 @@ def plot22(obs, sim, colname, energies=[[300, 1000], [1000, 2000]]):
     fig = plt.figure(figsize=(7, 7))
     for i, data in enumerate([obs, sim]):
         for j, en in enumerate(energies):
-            ax = fig.add_subplot(2, 2, i * 2 + j + 1)
+            ax = fig.add_subplot(2, 2, i * 2 + j + 1, aspect='equal')
             obssimlab = 'Obs' if i == 0 else 'MARX'
             energylab = '{0} - {1} eV'.format(en[0], en[1])
             ax.set_title('{0}: {1}'.format(obssimlab, energylab))

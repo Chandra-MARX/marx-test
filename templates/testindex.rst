@@ -32,7 +32,7 @@ may wish to inspect the code of the tests for some more ideas on how to use
 It will not execute as-is on your computer because it depends on the
 local ``$PATH`` and other environment variables. For example, we use Python
 scripts to set up a directory structure, download Chandra
-data, initialize `CIAO`_ etc. See `https://github.com/Chandra-MARX/marx-test`_
+data, initialize `CIAO`_ etc. See `<https://github.com/Chandra-MARX/marx-test>`_
 for the full code to run all tests.
 
 

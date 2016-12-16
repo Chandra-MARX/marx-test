@@ -4,6 +4,7 @@ from os.path import join as pjoin
 import os
 import sys
 import jinja2
+from matplotlib import pyplot as plt
 
 
 __all__ = ['write_summary_rst', 'run_and_output']
@@ -19,10 +20,10 @@ def setup_env(conffile):
     conf = ConfigParser()
     conf.read(conffile)
     outpath = conf.get('Output', 'outpath')
-
+    plt.style.use(conf.get('Output', 'matplotlibstyle'))
     jinjaenv = jinja2.Environment(loader=jinja2.FileSystemLoader(conf.get('Output', 'templates')))
 
-    # Get tests fomr test module
+    # Get tests from test module
     sys.path.append(conf.get('tests', 'path'))
     main_module = importlib.import_module(conf.get('tests', 'modulename'))
 

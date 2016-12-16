@@ -13,7 +13,9 @@ from marxtest import base
 
 title = 'Sources in |marx|'
 
-tests = ['GeometricSources', 'ImageSource', 'UserSource']
+tests = ['GeometricSources', 'ImageSource',
+         #'RayfileSource',
+         'UserSource']
 
 
 class GeometricSources(base.MarxTest):
@@ -134,7 +136,7 @@ class ImageSource(base.MarxTest):
     @base.Ciao
     def step_30(self):
         '''ds9 images of the PSF'''
-        return ['''ds9 -width 800 -height 500 -log -cmap heat input_image.fits image.fits -pan to 4018 4141 physical -zoom 0.5 -saveimage {0} -exit'''.format(self.figpath(self.figures.keys()[0]))]
+        return ['''ds9 -width 800 -height 500 -log -cmap heat input_image.fits image.fits -pan to 4018 4141 physical -zoom 0.5 -sleep 1 -saveimage {0} -exit'''.format(self.figpath(self.figures.keys()[0]))]
 
 
 class RayfileSource(base.MarxTest):
@@ -148,7 +150,7 @@ class RayfileSource(base.MarxTest):
 
     In this example, we look at a relatively large, diffuse emission region
     with a very soft spectrum (for simplicity we are using a flat spectrum).
-    We compare a simulation using ACIS-S and ACIS-I. ACIS-S has a better
+    We compare simulations using ACIS-S and ACIS-I. ACIS-S has a better
     response to soft photons, but some parts of the source may not be in the
     field-of-view; ACIS-I is less efficient for soft photons, but has a
     larger field-of-view.
@@ -156,7 +158,7 @@ class RayfileSource(base.MarxTest):
 
     title = 'Using a RAYFILE source'
 
-    figures = OrderedDict([('ds9', {'alternative': 'As described above, ACIS-S shows more photons, but ACIS-I does include more the wings of the GAussian source distribution',
+    figures = OrderedDict([('ds9', {'alternative': 'As described above, ACIS-S shows more photons, but ACIS-I does include more the wings of the Gaussian source distribution',
                                     'caption': '`ds9`_ shows the ACIS-I (left) and ACIS-S image (right). Both sources are generated from the same photon list. Sometimes the same pattern of photons can be seen in both images, but with a few events missing on ACIS-I due to the lower soft response.'})
                        ])
 
@@ -189,7 +191,7 @@ class RayfileSource(base.MarxTest):
         shifts photons of the same energy by a different amount for ACIS-S and
         ACIS-I, which would make it harder to compare the resulting images.
         '''
-        return [ '--pixadj=EXACT',  '--pixadj=EXACT'], ['acisi', 'aciss'], ['i.fits', 's.fits']
+        return ['--pixadj=EXACT',  '--pixadj=EXACT'], ['acisi', 'aciss'], ['i.fits', 's.fits']
 
     @base.Ciao
     def step_30(self):

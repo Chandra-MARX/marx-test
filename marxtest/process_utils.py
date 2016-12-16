@@ -130,7 +130,8 @@ def marxpars_from_asol(conf, asolfile, evt2file):
     return marx_pars
 
 
-def spectrum_from_fluxcorrection(conf, asolfile, evtfile, x, y, region, psffrac=1):
+def spectrum_from_fluxcorrection(conf, asolfile, evtfile, x, y, region,
+                                 psffrac=1):
     '''Estimate a source spectrum through flux correction.
 
     We will simply extract the counts in a region containing the observed PSF
