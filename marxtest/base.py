@@ -263,6 +263,26 @@ class Marx2fits(ExternalBaseWrapper):
             subprocess.call([marx2fitscall], shell=True, cwd=obj.basepath)
 
 
+class CCode(ExternalBaseWrapper):
+    '''Wrap a function that writes a C code file, e.g. a |marx| user source.
+
+    The output of that function is a tuple of two strings.
+    The first string is the filename (incl. file exension), the second string
+    is the file content.
+    '''
+    interpreter = "c"
+    program = "C source code"
+
+    def source(self):
+        return self.f(self.instance)[1]
+
+    def __call__(self, obj, conf):
+        out = self.f(obj)
+        with open(out[0], 'w') as f:
+            for line in out[1]:
+                f.write(line)
+
+
 class SAOTraceLua(ExternalBaseWrapper):
     '''Wrap a function that writes a lua input file for `SAOTrace`_.
 
