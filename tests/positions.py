@@ -26,7 +26,7 @@ from marxtest import base
 
 title = 'Coordinates on the sky and the chip'
 
-tests = ['RegularGrid']
+tests = ['RegularGrid', 'RegularGridHRCI']
 
 
 class RegularGrid(base.MarxTest):
@@ -40,12 +40,12 @@ class RegularGrid(base.MarxTest):
     it, and call is as a ``USER`` source (see :ref:`sect-usersource`).
     '''
 
-    title = 'Regular Grid'
-
     DetectorType = 'ACIS-I'
 
+    title = 'Regular Grid (ACIS)'
+
     figures = OrderedDict([('ds9', {'alternative': 'Sources positioned like knots in a spider web.',
-                                    'caption': '`ds9`_ image of the simulation. The size of the PSF increases further away from the aimpoint. (We have chosen one of the celestial poles as aimpoint to simulate a grid of sources that lines up with the Ra, Dec coordinates.)'}),
+                                    'caption': '`ds9`_ image of the simulation. The size of the PSF increases further away from the aimpoint.'}),
                            ('hist', {'alternative': 'Plot is described in the caption.',
                                      'caption': '*left*: The error in the position (measured radially to the optical axis) increases with the distance to the optical axis. One part of this is just that the effective area and thus the number of counts decreases. There is also a systematic trend where sources at larger off-acis angle are systematically fitted too close to the center. Further investigation is necessary to check if this is |marx| related to just due to the use of :ciao:`celldetect`. In any case, the typical offset is below 0.2 arcsec, which is less then half a pixel in ACIS. *right*: Difference in position angle between input and fit. (Outliers beyond the plot range are not shown.)'})
     ])
@@ -212,3 +212,37 @@ int main (int a, char **b)
         cbar2.set_label('net counts per source')
 
         fig.savefig(self.figpath(self.figures.keys()[1]))
+
+
+class RegularGridHRCI(RegularGrid):
+    '''Same as above, but with HRC-I as a detector.
+
+    The field-of-view for the HRC-I is larger for than for ACIS-I, but the PSF becomes
+    very large at large off-axis angles and thus the positional uncertainty
+    will be so large that a comparison to |marx| is no longer helpful to test
+    the accuracy of the |marx| simulations.
+    '''
+
+    figures = OrderedDict([('ds9', {'alternative': 'Sources positioned like knots in a spider web.',
+                                    'caption': 'See previous example'}),
+                           ('hist', {'alternative': 'Plot is described in the caption.',
+                                     'caption': 'See previous example. The same trends are visible with a slightly larger scatter.'})
+    ])
+
+    summary = 'The input position is typically recovered to better than 0.2 pixels for sources with a few hundred counts.'
+
+    DetectorType = 'HRC-I'
+    title = 'Regular grod (HRC)'
+
+    @base.Ciao
+    def step_10(self):
+        '''ds9 image of the PSF'''
+        return ['''ds9 -width 500 -height 500 -log -cmap heat points.fits -pan to 16392 16392 physical -bin factor 16 -grid -saveimage {0} -exit'''.format(self.figpath(self.figures.keys()[0]))]
+
+    @base.Ciao
+    def step_11(self):
+        '''Source detection'''
+        out = ['dmcopy "points.fits[EVENTS][bin x=8500:24500:8,y=8500:24500:8]" im.fits  option=image clobber=yes',
+          'celldetect im.fits src.fits clobber=yes'
+               ]
+        return out
