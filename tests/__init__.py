@@ -1,1 +1,1 @@
-modulelist = ['PSF', 'grades', 'spectrum', 'source']
+modulelist = ['PSF', 'grades', 'spectrum', 'source', 'positions']
