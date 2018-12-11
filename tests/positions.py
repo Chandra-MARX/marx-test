@@ -76,7 +76,7 @@ class ONC(base.MarxTest):
         tab['DEC'] = (coup['DEJ2000'] - asol['DEC_NOM']) * 60
         tab['weight'] = 10**(coup['Lt'] - 27)
         tab['energy'] = coup['<E>']
-        tab.write('coup.marxin', format='ascii.no_header')
+        tab.write('coup.marxin', format='ascii.no_header', overwrite=True)
 
     @base.CCode
     def step_5(self):
@@ -330,7 +330,8 @@ int main (int a, char **b)
     def step_11(self):
         '''Source detection'''
         out = ['dmcopy "COUP.fits[EVENTS][bin x=2500:5500:2,y=2500:5500:2]" im.fits  option=image clobber=yes',
-          'celldetect im.fits src.fits clobber=yes'
+             'mkpsfmap im.fits psf.map 1.4 ecf=0.5',
+          'celldetect im.fits src.fits psffile=psf.map clobber=yes'
                ]
         return out
 
@@ -500,7 +501,8 @@ int main (int a, char **b)
     def step_11(self):
         '''Source detection'''
         out = ['dmcopy "points.fits[EVENTS][bin x=3000:5100:2,y=3000:5100:2]" im.fits  option=image clobber=yes',
-          'celldetect im.fits src.fits clobber=yes'
+                 'mkpsfmap im.fits psf.map 1.4 ecf=0.5',
+          'celldetect im.fits src.fits psffile=psf.map clobber=yes'
                ]
         return out
 
@@ -582,6 +584,7 @@ class RegularGridHRCI(RegularGrid):
     def step_11(self):
         '''Source detection'''
         out = ['dmcopy "points.fits[EVENTS][bin x=8500:24500:8,y=8500:24500:8]" im.fits  option=image clobber=yes',
-          'celldetect im.fits src.fits clobber=yes'
+                 'mkpsfmap im.fits psf.map 1.4 ecf=0.5',
+          'celldetect im.fits src.fits psffile=psf.map clobber=yes'
                ]
         return out

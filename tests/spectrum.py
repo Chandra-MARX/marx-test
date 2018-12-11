@@ -311,8 +311,8 @@ class SpectrumAbsPowACISS(base.MarxTest):
         a2 = get_arf(2)
         # bring on same energy grid
         engrid = np.arange(0.3, 10., 0.05)
-        a1 = np.interp(engrid, a1.get_x(), a1.get_y())
-        a2 = np.interp(engrid, a2.get_x(), a2.get_y())
+        a1 = np.interp(engrid, 0.5 * (a1.energ_lo + a1.energ_hi), a1.get_y())
+        a2 = np.interp(engrid, 0.5 * (a2.energ_lo + a2.energ_hi) , a2.get_y())
 
         out['arfdiff'] = np.mean(np.abs(a2/a1 -1))
 

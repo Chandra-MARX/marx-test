@@ -602,7 +602,8 @@ class Wings(HRCIPSF):
         evtfile = self.get_data_file('evt2')
         asolfile = self.get_data_file('asol')
         return ['dmcopy "{0}[bin x=3700:4300:1,y=3700:4300:1][opt type=i4]" im.fits option=image clobber=yes'.format(evtfile),
-               'celldetect im.fits im_src.fits clobber=yes',
+               'mkpsfmap im.fits psf.map 1.4 ecf=0.5',
+               'celldetect im.fits im_src.fits psffile=psf.map clobber=yes',
                'asphist {0} asphist_7.fits evtfile="{1}[ccd_id=7]" clobber=yes'.format(asolfile, evtfile)
                ]
 

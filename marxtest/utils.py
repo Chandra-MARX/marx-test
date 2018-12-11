@@ -142,7 +142,7 @@ def download_chandra(obsid, targetdir, products=None):
     obsid = str(obsid)
     dataroot = 'pub/byobsid/{0}/{1}/'.format(obsid[-1], obsid)
     # Download some files from the login directory.
-    with ftputil.FTPHost('cdaftp.cfa.harvard.edu', 'anonymous', 'marx-help@space.mit.edu') as host:
+    with ftputil.FTPHost('cda.cfa.harvard.edu', 'anonymous', 'marx-help@space.mit.edu') as host:
         host.chdir(dataroot)
         _copy_into_dir(host, targetdir, products)
         host.chdir('primary')

@@ -8,7 +8,6 @@ import subprocess
 import os
 import re
 from ConfigParser import NoOptionError
-from warnings import warn
 
 con = None
 configdict = {}
