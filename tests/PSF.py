@@ -172,8 +172,7 @@ class HRCIPSF(base.MarxTest):
                                     'caption': 'Enclosed count fraction for observation and simulations.'})
                        ])
 
-    summary = '''In contrast to the ACIS simulations, in the HRC-I the observed PSF is in fact narrower than all simulations in the range shown here. The difference is most prominent between about one and two HRC resolution elements where the |marx| simulation is about midway between the true observed PSF shape and the `SAOTrace`_  + |marx| predicted shape.'''
-
+    summary = '''The PSF predicted by `SAOTrace`_  + |marx| tracks the general shape pf the observed PSF well, though differences are apparent in the core and in the wings. Like in ACIS, the PSF simulated with |marx| alone is narrower than the observed PSF.'''
     source = {'x': 16405,
               'y': 16500,
               'r': 15,
