@@ -1,5 +1,5 @@
 import importlib
-from ConfigParser import ConfigParser
+from configparser import ConfigParser
 from os.path import join as pjoin
 import os
 import sys

@@ -13,8 +13,8 @@ class PowerScale(mscale.ScaleBase):
         """
         power: The p in x**p.
         """
-        mscale.ScaleBase.__init__(self)
         self.power = kwargs.pop("power", 1.)
+        super().__init__(axis, **kwargs)
 
     def get_transform(self):
         """
@@ -75,7 +75,7 @@ class PowerScale(mscale.ScaleBase):
             Override this method so matplotlib knows how to get the
             inverse transform for this transform.
             """
-            return PowerScale.PowerTransform(1./self.power)
+            return PowerScale.PowerTransform(1. / self.power)
 
 # Now that the Scale class has been defined, it must be registered so
 # that ``matplotlib`` can find it.

@@ -176,7 +176,7 @@ def spectrum_from_fluxcorrection(conf, asolfile, evtfile, x, y, region,
               ]
     ccd_id = subprocess.check_output([conf.get('CIAO', 'setup') + '\n' + '\n'.join(cmdlist)],
                     shell=True)
-    ccd_id = ccd_id.split('\n')[-2]
+    ccd_id = ccd_id.split(b'\n')[-2].decode()
 
     return '''
 asphist infile={asolfile} outfile=obs.asp evtfile={evtfile} clobber=yes

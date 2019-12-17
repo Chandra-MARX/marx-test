@@ -83,11 +83,25 @@ In this particular case, there is very little source signal above 2 keV, so the 
     def step_0(self):
         '''Download data, extract point source'''
         evt2 = self.get_data_file('evt2')
+        # Just downloading asol here so I can unzip it in the next step
+        asol = self.get_data_file('asol')
         return ["punlearn dmcopy",
                 'dmcopy "{0}[sky=circle(4096,4073,6)]" obs.fits clobber=yes'.format(evt2)]
+    @base.Shell
+    def step_1(self):
+        '''Unzip fits file.
+
+        MARX cannot read zipped fits files, so we need to unzip the .fits.gz asol
+        files that we downloaded from the archive. On the other hand, `CIAO`_
+        tools work on both zipped or unzipped files, so there is no need to
+        unzip all of them, just the files that MARX reads as input.
+        '''
+        asol = self.get_data_file('asol')
+        return [f'gunzip -f {asol}']
+
 
     @base.Marx
-    def step_1(self):
+    def step_11(self):
         '''Run in energy band, match observational setup'''
         asol = self.get_data_file('asol')
         evt2 = self.get_data_file('evt2')
@@ -97,21 +111,21 @@ In this particular case, there is very little source signal above 2 keV, so the 
         return pars
 
     @base.Marx2fits
-    def step_2(self):
+    def step_12(self):
         '''use EDSER'''
         return ('--pixadj=EDSER', 'point', 'marxsim.fits')
 
     @base.Python
-    def step_3(self):
+    def step_13(self):
         '''Plot grade distribution'''
         obs = Table.read(os.path.join(self.basepath, 'obs.fits'), hdu=1)
         sim = Table.read(os.path.join(self.basepath, 'marxsim.fits'), hdu=1)
 
         fig1 = plot22(obs, sim, 'grade')
-        fig1.savefig(self.figpath('grades'))
+        fig1.savefig(self.figpath('grades'), bbox_inches='tight')
 
         fig2 = plot22(obs, sim, 'fltgrade')
-        fig2.savefig(self.figpath('fltgrades'))
+        fig2.savefig(self.figpath('fltgrades'), bbox_inches='tight')
 
 
 class ACIS_FI(ACIS_BI_low_energy):
@@ -130,7 +144,7 @@ class ACIS_FI(ACIS_BI_low_energy):
                 'dmcopy "{0}[sky=circle(4072,4065,5)]" obs.fits clobber=yes'.format(evt2)]
 
     @base.Marx
-    def step_1(self):
+    def step_11(self):
         '''Run in energy band, match observational setup'''
         asol = self.get_data_file('asol')
         evt2 = self.get_data_file('evt2')
@@ -140,13 +154,13 @@ class ACIS_FI(ACIS_BI_low_energy):
         return pars
 
     @base.Python
-    def step_3(self):
+    def step_13(self):
         '''Plot grade distribution'''
         obs = Table.read(os.path.join(self.basepath, 'obs.fits'), hdu=1)
         sim = Table.read(os.path.join(self.basepath, 'marxsim.fits'), hdu=1)
 
         fig1 = plot22(obs, sim, 'grade', [[2000., 3000.], [3000., 4000.]])
-        fig1.savefig(self.figpath('grades'))
+        fig1.savefig(self.figpath('grades'), bbox_inches='tight')
 
         fig2 = plot22(obs, sim, 'fltgrade', [[2000., 3000.], [3000., 4000.]])
-        fig2.savefig(self.figpath('fltgrades'))
+        fig2.savefig(self.figpath('fltgrades'), bbox_inches='tight')

@@ -7,7 +7,7 @@ from functools import wraps
 import subprocess
 import os
 import re
-from ConfigParser import NoOptionError
+from configparser import NoOptionError
 
 con = None
 configdict = {}
@@ -104,12 +104,14 @@ def marx_version(conf):
     '''
     out = subprocess.check_output([os.path.join(conf.get('marx', 'binpath'), 'marx'),
                                    '--version'], stderr=subprocess.STDOUT)
-    ver = re.match(r'MARX version ([0-9.]+)', out)
+    ver = re.match(b'MARX version ([0-9.]+)', out)
     return ver.groups()[0]
 
 
 def ciaocaldb_version(conf):
     '''Return the CIAO and CalDB version
+
+    Works for both ciao-install and conda installs
 
     Parameters
     ----------
@@ -121,12 +123,12 @@ def ciaocaldb_version(conf):
         CIAO and CALDB version
     '''
 
-    out = subprocess.check_output([conf.get('CIAO', 'setup')],
+    out = subprocess.check_output(['ciaover'],
                                   stderr=subprocess.STDOUT, shell=True)
-    ciao = re.search(r'CIAO ([0-9.]+)', out)
-    caldb = re.search(r'CALDB[\s]+:[\s]+([0-9.]+)', out)
+    ciao = re.search(b'CIAO\s+([0-9.]+)', out, re.I )
+    caldb = re.search(b'CALDB\s+[: ]?([0-9.]+)', out, re.I)
 
-    return ciao.groups()[0], caldb.groups()[0]
+    return ciao.groups()[0].decode(), caldb.groups()[0].decode()
 
 
 def saotrace_version(conf):
@@ -144,7 +146,7 @@ def saotrace_version(conf):
     out = subprocess.check_output([conf.get('SAOTrace', 'setup') +
                                    '\nwhich trace-nest'],
                                   shell=True)
-    saotrace = re.search('saotrace-([0-9.]+)', out)
+    saotrace = re.search(b'saotrace-([0-9.]+)', out)
     return saotrace.groups()[0]
 
 

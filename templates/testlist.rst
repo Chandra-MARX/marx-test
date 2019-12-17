@@ -18,7 +18,7 @@
 
 {{ testinstance.doc }}
 
-{% for figname, figure in testinstance.figures.iteritems() %}
+{% for figname, figure in testinstance.figures.items() %}
 
 .. figure:: {{ figpath }}/{{testinstance.name}}_{{ figname }}.*
    :align: center

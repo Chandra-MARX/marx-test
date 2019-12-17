@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import os
 import functools
 import inspect
@@ -9,11 +7,13 @@ from glob import glob
 from collections import OrderedDict
 import textwrap
 
-from .utils import download_chandra, ChangeDir
+from ciao_contrib.cda.data import download_chandra_obsids
+
+from .utils import ChangeDir
 from . import database
 
 
-class ExternalBaseWrapper(object):
+class ExternalBaseWrapper():
     '''Wrap a function that is run as part of a test.
 
     The wrapped function will have two important methods: ``__call__``
@@ -80,13 +80,17 @@ class ExternalBaseWrapper(object):
         '''
         self.f(obj)
 
-    def __get__(self, instance, cls=None):
-        '''This implements the descriptor protocol and allows this
+    def __get__(self, obj, objtype=None):
+        """Simulate func_descr_get() in Objects/funcobject.c
+
+        This implements the descriptor protocol and allows this
         callable class to be used as a bound method.
-        See https://docs.python.org/2/howto/descriptor.html#functions-and-methods
-        '''
-        self.instance = instance
-        return types.MethodType(self, instance, cls)
+        See https://docs.python.org/3/howto/descriptor.html#functions-and-methods
+        """
+        self.instance = obj
+        if obj is None:
+            return self
+        return types.MethodType(self, obj)
 
 
 class Python(ExternalBaseWrapper):
@@ -107,7 +111,7 @@ class Python(ExternalBaseWrapper):
         fsource = inspect.getsourcelines(self.f)[0][2:]
         fsource = textwrap.dedent(''.join(fsource))
         # find other functions defined in same module (e.g. plotting helpers)
-        for k, v in self.f.func_globals.iteritems():
+        for k, v in self.f.__globals__.items():
             if hasattr(v, '__module__') and v.__module__ == self.f.__module__:
                 # and if they are mentioned in the source code, list them, too.
                 if k in fsource:
@@ -141,7 +145,27 @@ class Sherpa(ExternalBaseWrapper):
                          cwd=obj.basepath, shell=True)
 
 
-class Ciao(ExternalBaseWrapper):
+class Shell(ExternalBaseWrapper):
+    '''Wrap functions that generate shell commands.
+
+    The output format of the wrapped function is a list of strings.
+
+    On display with ``source()`` absolute path in the commands will be
+    replaced with relative path, which are typically shorter in print.
+    '''
+    interpreter = "shell"
+    program = 'shell'
+
+    def source(self):
+        return '\n'.join(self.f(self.instance)).replace(self.instance.basepath + '/', '')
+
+    def __call__(self, obj, conf):
+        commands = self.f(obj)
+        print('\n'.join(commands))
+        subprocess.call(['\n'.join(commands)], shell=True, cwd=obj.basepath)
+
+
+class Ciao(Shell):
     '''Wrap functions that generate `CIAO`_ shell commands.
 
     The output format of the wrapped function is a list of strings.
@@ -149,11 +173,7 @@ class Ciao(ExternalBaseWrapper):
     On display with ``source()`` absolute path in the CIAO commands will be
     replaced with relative path, which are typically shorter in print.
     '''
-    interpreter = "shell"
     program = 'CIAO'
-
-    def source(self):
-        return '\n'.join(self.f(self.instance)).replace(self.instance.basepath + '/', '')
 
     def __call__(self, obj, conf):
         commands = self.f(obj)
@@ -187,19 +207,19 @@ class Marx(ExternalBaseWrapper):
 
         calls = []
         for p in par:
-            marxcall = ['{0}={1}'.format(k, v) for k, v in p.iteritems()]
+            marxcall = ['{0}={1}'.format(k, v) for k, v in p.items()]
             marxcall.insert(0, self.program)
             calls.append(' '.join(marxcall).replace(self.instance.basepath + '/', ''))
         return '\n'.join(calls)
 
     def __call__(self, obj, conf):
         '''Assemble string for marxcall using path information from env.'''
-        par = self.f(self.instance)
+        par = self.f(obj)
         if isinstance(par, dict):
             par = [par]
 
         for p in par:
-            marxcall = ['{0}={1}'.format(k, v) for k, v in p.iteritems()]
+            marxcall = ['{0}={1}'.format(k, v) for k, v in p.items()]
             marxcall.insert(0, os.path.join(conf.get('marx', 'binpath'),
                                             self.program))
             if not os.path.exists('{0}.par'.format(self.program)):
@@ -256,7 +276,7 @@ class Marx2fits(ExternalBaseWrapper):
         return '\n'.join(source)
 
     def __call__(self, obj, conf):
-        options, marxdir, outfile = self.args2list(self.f(self.instance))
+        options, marxdir, outfile = self.args2list(self.f(obj))
         exefile = os.path.join(conf.get('marx', 'binpath'), self.program)
         for op, md, out in zip(options, marxdir, outfile):
             marx2fitscall = ' '.join([exefile, op, md, out])
@@ -312,7 +332,7 @@ class SAOTrace(Ciao):
     program = "SAOTrace"
 
 
-class MarxTest(object):
+class MarxTest():
     '''Base class to specify a |marx| test.
 
     Each test for |marx| is written as class that is derived from this
@@ -408,7 +428,8 @@ class MarxTest(object):
         self.basepath = os.path.abspath(os.path.join(self.conf.get('Output','temppath'),
                                                      self.name))
         if hasattr(self, 'obsid') and self.download_all:
-            download_chandra(self.obsid, self.datapath)
+            with ChangeDir(self.datapath):
+                download_chandra_obsids([self.obsid])
 
         for t in self.expresults:
             database.insert_expected_result(self.conf, self.name, t['name'],
@@ -511,11 +532,13 @@ class MarxTest(object):
             set to ``None``. Check the spelling of ``filetype``!
         '''
         filename = glob(os.path.join(self.datapath,
+                                     '*',  # ObsID
                                      '*',  # primary or secondary
                                      '*{0}*'.format(filetype)))
         if len(filename) == 0:
             if download:
-                download_chandra(self.obsid, self.datapath, [filetype])
+                with ChangeDir(self.datapath):
+                    download_chandra_obsids([self.obsid], [filetype])
                 return self.get_data_file(filetype, download=False)
             else:
                 return None
@@ -524,7 +547,12 @@ class MarxTest(object):
             return filename[0]
 
         else:
-            raise ValueError('Specification not unique. Found {0}'.format(filename))
+            # If zipped and unzipped file are present, this might still be OK
+            filename.sort()
+            if len(filename) == 2 and (filename[0] + '.gz' == filename[1]):
+                return filename[0]
+            else:
+                raise ValueError('Specification not unique. Found {0}'.format(filename))
 
     def save_test_result(self, testname, value, sigma=None, sigma2=None):
         '''Save a test result to the test database.

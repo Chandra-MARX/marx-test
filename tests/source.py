@@ -60,7 +60,7 @@ class GeometricSources(base.MarxTest):
     @base.Ciao
     def step_30(self):
         '''ds9 images of the PSF'''
-        return ['''ds9 -width 800 -height 500 -log -cmap heat *.fits -pan to 4018 4141 physical -match frame wcs -saveimage {0} -exit'''.format(self.figpath(self.figures.keys()[0]))]
+        return ['''ds9 -width 800 -height 500 -log -cmap heat *.fits -pan to 4018 4141 physical -match frame wcs -saveimage {0} -exit'''.format(self.figpath(list(self.figures.keys())[0]))]
 
 
 class ImageSource(base.MarxTest):
@@ -136,7 +136,7 @@ class ImageSource(base.MarxTest):
     @base.Ciao
     def step_30(self):
         '''ds9 images of the PSF'''
-        return ['''ds9 -width 800 -height 500 -log -cmap heat input_image.fits image.fits -pan to 4018 4141 physical -zoom 0.5 -sleep 1 -saveimage {0} -exit'''.format(self.figpath(self.figures.keys()[0]))]
+        return ['''ds9 -width 800 -height 500 -log -cmap heat input_image.fits image.fits -pan to 4018 4141 physical -zoom 0.5 -sleep 1 -saveimage {0} -exit'''.format(self.figpath(list(self.figures.keys())[0]))]
 
 
 class RayfileSource(base.MarxTest):
@@ -196,7 +196,7 @@ class RayfileSource(base.MarxTest):
     @base.Ciao
     def step_30(self):
         '''ds9 images of the PSF'''
-        return ['''ds9 -width 800 -height 500 -log -cmap heat i.fits s.fits -pan to 4018 4141 physical -match frame wcs -saveimage {0} -exit'''.format(self.figpath(self.figures.keys()[0]))]
+        return ['''ds9 -width 800 -height 500 -log -cmap heat i.fits s.fits -pan to 4018 4141 physical -match frame wcs -saveimage {0} -exit'''.format(self.figpath(list(self.figures.keys())[0]))]
 
 
 class SimputSource(base.MarxTest):
@@ -256,4 +256,4 @@ class UserSource(base.MarxTest):
     @base.Ciao
     def step_30(self):
         '''ds9 images of the PSF'''
-        return ['''ds9 -width 800 -height 500 -log -cmap heat point.fits -pan to 4018 4141 physical -zoom 8 -saveimage {0} -exit'''.format(self.figpath(self.figures.keys()[0]))]
+        return ['''ds9 -width 800 -height 500 -log -cmap heat point.fits -pan to 4018 4141 physical -zoom 8 -saveimage {0} -exit'''.format(self.figpath(list(self.figures.keys())[0]))]

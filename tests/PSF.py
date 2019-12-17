@@ -3,8 +3,6 @@ The `point-spread function (PSF) for Chandra <http://cxc.harvard.edu/ciao/PSFs/p
 
 The following tests compare |marx| simulations, `SAOTrace`_ simulations, and data to look at different aspects of the Chandra PSF.
 '''
-from __future__ import division
-
 import os
 import numpy as np
 from collections import OrderedDict
@@ -153,8 +151,8 @@ def radial_distribution(x, y):
     r : np.array
         radial distance from mean position of the events.
     '''
-    centx = x - astropy.stats.sigma_clipped_stats(x, sigma=1.5, iters=20)[0]
-    centy = y - astropy.stats.sigma_clipped_stats(y, sigma=1.5, iters=20)[0]
+    centx = x - astropy.stats.sigma_clipped_stats(x, sigma=1.5, maxiters=20)[0]
+    centy = y - astropy.stats.sigma_clipped_stats(y, sigma=1.5, maxiters=20)[0]
 
     xy = np.vstack([centx, centy])
     return np.linalg.norm(xy, axis=0)
@@ -219,8 +217,20 @@ class HRCIPSF(base.MarxTest):
         shutil.copy(os.path.join(self.pkg_data, 'ARLac_input_spec_saotrace.rdb'),
                     os.path.join(self.basepath, 'input_spec_saotrace.rdb'))
 
-    @base.Marx
+    @base.Shell
     def step_1(self):
+        '''Unzip fits file.
+
+        MARX cannot read zipped fits files, so we need to unzip the .fits.gz asol
+        files that we downloaded from the archive. On the other hand, `CIAO`_
+        tools work on both zipped or unzipped files, so there is no need to
+        unzip all of them, just the files that MARX reads as input.
+        '''
+        asol = self.get_data_file('asol')
+        return [f'gunzip -f {asol}']
+
+    @base.Marx
+    def step_11(self):
         '''Set marx parameters appropriate for observation'''
         asol = self.get_data_file('asol')
         evt = self.get_data_file('evt2')
@@ -232,12 +242,12 @@ class HRCIPSF(base.MarxTest):
         return pars
 
     @base.Marx2fits
-    def step_2(self):
+    def step_12(self):
         '''No EDSER is available for HRC data'''
         return ('--pixadj=NONE', 'marx_only', 'marx_only.fits')
 
     @base.SAOTraceLua
-    def step_3(self):
+    def step_13(self):
         '''`SAOTrace`_ input matching observation'''
         asol = self.get_data_file('asol')
         asolh = fits.getheader(asol, 1)
@@ -268,7 +278,7 @@ point{{ position = {{ ra = {ra},
            ra=evt['RA_TARG'], dec=evt['DEC_TARG'])
 
     @base.SAOTrace
-    def step_4(self):
+    def step_14(self):
         '''
         CXO time numbers are large and round-off error can appear
         which make `SAOTrace`_ fail.
@@ -282,7 +292,7 @@ point{{ position = {{ ra = {ra},
         return ['trace-nest tag=saotrace srcpars=saotrace_source.lua tstart={tstart}  limit={limit} limit_type=sec'.format(tstart=asolh['TSTART'] + 0.01, limit=limit)]
 
     @base.Marx
-    def step_5(self):
+    def step_15(self):
         '''Run |marx| with `SAOTrace`_ ray file as input'''
         asol = self.get_data_file('asol')
         evt = self.get_data_file('evt2')
@@ -296,12 +306,12 @@ point{{ position = {{ ra = {ra},
         return pars
 
     @base.Marx2fits
-    def step_6(self):
+    def step_16(self):
         '''Same settings as the marx2fits run above'''
         return ('--pixadj=NONE', 'marx_saotrace', 'marx_saotrace.fits')
 
     @base.Python
-    def step_20(self):
+    def step_30(self):
         '''Extract radial count distribution'''
         import matplotlib.pyplot as plt
         filterargs = {'circle': (self.source['x'], self.source['y'],
@@ -321,7 +331,8 @@ point{{ position = {{ ra = {ra},
         err_marx, err_sao = plot_ecf(ax, files, filterargs, bgfilterargs)
         ax.set_xlim([0, 20.])
 
-        fig.savefig(self.figpath(self.figures.keys()[0]))
+        fig.savefig(self.figpath(list(self.figures.keys())[0]),
+                    bbox_inches='tight')
 
         self.save_test_result('marx90', err_marx)
         self.save_test_result('saotrace90', err_sao)
@@ -382,34 +393,34 @@ The put those numbers into perspective: If I used the |marx| simulation to deter
         return commands
 
     @base.Marx2fits
-    def step_2(self):
+    def step_12(self):
         '''Use the EDSER subpixel algorithm'''
         return ('--pixadj=EDSER', 'marx_only', 'marx_only.fits')
 
     @base.Marx2fits
-    def step_6(self):
+    def step_16(self):
         '''Same setting as above for comparison'''
         return ('--pixadj=EDSER', 'marx_saotrace', 'marx_saotrace.fits')
 
     @base.Marx2fits
-    def step_10(self):
+    def step_20(self):
         '''USE RANDOMIZE as an alternative to EDSER'''
         return ('--pixadj=RANDOMIZE', 'marx_only', 'marx_only_rand.fits')
 
     @base.Marx2fits
-    def step_11(self):
+    def step_21(self):
         '''Again, same setting as above'''
         return ('--pixadj=RANDOMIZE', 'marx_saotrace', 'marx_saotrace_rand.fits')
 
     @base.Ciao
-    def step_12(self):
+    def step_22(self):
         '''Reprocess the observation with RANDOMIZE'''
         evt2 = self.get_data_file('evt2')
         asol = self.get_data_file('asol')
         return ['acis_process_events infile={evt} outfile=obs_rand.fits acaofffile={asol} doevtgrade=no calculate_pi=no pix_adj=RANDOMIZE clobber=yes'.format(evt=evt2, asol=asol)]
 
     @base.Python
-    def step_20(self):
+    def step_30(self):
         '''Compare radial event distributions'''
         import matplotlib.pyplot as plt
 
@@ -440,7 +451,8 @@ The put those numbers into perspective: If I used the |marx| simulation to deter
                 self.save_test_result('marx90', err_marx)
                 self.save_test_result('saotrace90', err_sao)
 
-        fig.savefig(self.figpath(self.figures.keys()[0]))
+        fig.savefig(self.figpath(list(self.figures.keys())[0]),
+                    bbox_inches='tight')
 
 
 class ACISIPSF(ACISSPSF):
@@ -512,9 +524,9 @@ simplification that the |marx| mirror model makes.'''
         return commands
 
     @base.Ciao
-    def step_20(self):
+    def step_30(self):
         '''ds9 images of the PSF'''
-        return ['''ds9 -width 800 -height 500 -log -cmap heat {0} marx_only.fits marx_saotrace.fits -pan to 5256 6890 physical -bin about 5256 6890 -match frame wcs -match bin -frame 1 -regions command 'text 5:39:27.987 -69:43:52.31 # text=Observation font="helvetica 24"' -frame 2 -regions command 'text 5:39:27.987 -69:43:52.31 # text="only MARX" font="helvetica 24"' -frame 3 -regions command 'text 5:39:27.987 -69:43:52.31 # text=SAOTrace font="helvetica 24"' -regions command 'text 5:39:26.691 -69:44:09.93 # text="+ MARX" font="helvetica 24"' -saveimage {1} -exit'''.format(self.get_data_file('evt2'), self.figpath(self.figures.keys()[0]))]
+        return ['''ds9 -width 800 -height 500 -log -cmap heat {0} marx_only.fits marx_saotrace.fits -pan to 5256 6890 physical -bin about 5256 6890 -match frame wcs -match bin -frame 1 -regions command 'text 5:39:27.987 -69:43:52.31 # text=Observation font="helvetica 24"' -frame 2 -regions command 'text 5:39:27.987 -69:43:52.31 # text="only MARX" font="helvetica 24"' -frame 3 -regions command 'text 5:39:27.987 -69:43:52.31 # text=SAOTrace font="helvetica 24"' -regions command 'text 5:39:26.691 -69:44:09.93 # text="+ MARX" font="helvetica 24"' -saveimage {1} -exit'''.format(self.get_data_file('evt2'), self.figpath(list(self.figures.keys())[0]))]
 
 
 class Wings(HRCIPSF):
@@ -541,7 +553,7 @@ class Wings(HRCIPSF):
                                     'caption': 'The surface brightness falls off with increasing distance from the source position as a powerlaw. The exponent of this powerlaw depends on the photon energy as shown in the figure. If spectra are extracted in the scattering halo the observed spectrum will thus change with distance from the source. For the observed data, the low energy end (below about 1 keV) has to be taken with a grain of salt. We applied a correction for the ACIS contamination in the data reduction, but the distribution of the contaminant over the detector area is not well known, leading to systematic uncertainties. For energies above 5 keV, the outer mirror shell does not contribute much effective area any longer. This shell has the roughest surface, which explains why we observe steeper powerlaw slopes for higher eneergies. Both the |marx| and the `SAOTrace` mirror model also have energy dependent exponents.'})
                        ])
 
-    summary = '''Both |marx| and `SAOTrace`_ implement a mirror model that has wide scattering wings which are also seen in actual Chandra data. These wings can be traced out to at least 8 arcmin. On the other hand, these scattering wings are very weak (the flux per surface area drops by about four orders of magnitute between 10 arcsec and 500 arcsec for an on-axis source) and thus they are not not relevant in any but the very brightest objects. The `SAOTrace` mirror model produces a smoother distribution that is more similar to the observed data tan |marx|. In both mirror models the slope depends on the energy. `SAOTrace`_ reproduces the shape of the observed data very well, but the exponent is significantly too steep everywhere. Thus, spectra extracted in the halo will be compatible with observed data, but the flux in the simulation will be too low. On the other hand, |marx| produces more realistic exponents above 1 keV, so it will match the observed surface brightness better, but not the spectral properties. '''
+    summary = '''Both |marx| and `SAOTrace`_ implement a mirror model that has wide scattering wings which are also seen in actual Chandra data. These wings can be traced out to at least 8 arcmin. On the other hand, these scattering wings are very weak (the flux per surface area drops by about four orders of magnitute between 10 arcsec and 500 arcsec for an on-axis source) and thus they are not not relevant in any but the very brightest objects. The `SAOTrace` mirror model produces a smoother distribution that is more similar to the observed data than |marx|. In both mirror models the slope depends on the energy. `SAOTrace`_ reproduces the shape of the observed data very well, but the exponent is significantly too steep everywhere. Thus, spectra extracted in the halo will be compatible with observed data, but the flux in the simulation will be too low. On the other hand, |marx| produces more realistic exponents above 1 keV, so it will match the observed surface brightness better, but not the spectral properties. '''
 
     source = {'x': 4174,
               'y': 4043}
@@ -586,17 +598,17 @@ class Wings(HRCIPSF):
         return commands
 
     @base.Marx2fits
-    def step_2(self):
+    def step_12(self):
         '''Use the EDSER subpixel algorithm'''
         return ('--pixadj=EDSER', 'marx_only', 'marx_only.fits')
 
     @base.Marx2fits
-    def step_6(self):
+    def step_16(self):
         '''Same setting as above for comparison'''
         return ('--pixadj=EDSER', 'marx_saotrace', 'marx_saotrace.fits')
 
     @base.Ciao
-    def step_14(self):
+    def step_24(self):
         '''Make image and run cell detect to find exclusion regions for extraction.'''
         evtfile = self.get_data_file('evt2')
         asolfile = self.get_data_file('asol')
@@ -607,7 +619,7 @@ class Wings(HRCIPSF):
                ]
 
     @base.Ciao
-    def step_15(self):
+    def step_25(self):
         '''Create exposure maps
 
         Also, make exposure map for S-3 chip to correct for dither etc. Mirror effective
@@ -635,7 +647,7 @@ class Wings(HRCIPSF):
         return out
 
     @base.Python
-    def step_16(self):
+    def step_26(self):
         '''Clean bogus sources from src file and write regions
 
         celldetect always detects plenty of sources on the read-out streak and
@@ -682,7 +694,7 @@ class Wings(HRCIPSF):
                 f.write(reg + '\n')
 
     @base.Ciao
-    def step_17(self):
+    def step_27(self):
         '''Extract data in energy bins'''
         evtfile = self.get_data_file('evt2')
 
@@ -698,15 +710,23 @@ class Wings(HRCIPSF):
         return out
 
     @base.Python
-    def step_20(self):
+    def step_30(self):
         '''Analyze and plot results - Plot 1'''
         import numpy as np
         from matplotlib import pyplot as plt
         from astropy.table import Table
-        from astropy.modeling import models
-        import saba
-        powconst = models.PowerLaw1D + models.Const1D
-        fit_g = saba.SherpaFitter(statistic='chi2', optimizer='levmar')
+        from sherpa.data import Data1D
+        from sherpa.models.basic import Const1D, PowLaw1D
+        from sherpa.stats import Chi2
+        from sherpa.optmethods import LevMar
+        from sherpa.fit import Fit
+
+        # set up Sherpa fitting
+        const1d = Const1D()
+        const1d.c0.min = 0
+        pow1d = PowLaw1D()
+        stat = Chi2()
+        opt = LevMar()
 
         fig = plt.figure(figsize=(10, 8))
         energy_index = [1, 8, 18, 24]
@@ -717,7 +737,7 @@ class Wings(HRCIPSF):
             e_upper = self.energy_bins[energy_index[i] + 1]
             ax = fig.add_subplot(2, 2, i + 1)
             for j, name in enumerate(['obs', 'marx', 'saotrace']):
-                tab = Table.read('profile_{0:3.1f}_{1}.fits'.format(e, name))
+                tab = Table.read(f'profile_{e:3.1f}_{name}.fits', hdu=1)
                 r = np.mean(tab['R'], axis=1)
                 r_arcsec = r * 0.492
                 indfit = r_arcsec > 15.
@@ -726,14 +746,16 @@ class Wings(HRCIPSF):
                                     label='__no_legend__')
 
                 if name == 'obs':
-                    mymod = powconst(amplitude_1=tab['SUR_FLUX'][-1],
-                                     bounds={'amplitude_1': (0, None)})
+                    mymod = const1d + pow1d
+                    const1d.c0.val = tab['SUR_FLUX'][-1]
                 else:
-                    mymod = models.PowerLaw1D()
-                # Multiply data values with 1e6 for numerical stability
-                g = fit_g(mymod, r[indfit], tab['SUR_FLUX'][indfit] * 1e6,
-                          err=tab['SUR_FLUX_ERR'][indfit] * 1e6)
-                ax.plot(r_arcsec, g(r) / 1e6, label=fullname[name],
+                    mymod = pow1d
+                data = Data1D('', r[indfit], tab['SUR_FLUX'][indfit],
+                              staterror=tab['SUR_FLUX_ERR'][indfit])
+                gfit = Fit(data, mymod, stat=stat, method=opt)
+                gfit.fit()
+
+                ax.plot(r_arcsec, mymod(r), label=fullname[name],
                         color=plots[0].get_color())
                 ax.set_title('{0:3.1f} - {1:3.1f} keV'.format(e, e_upper))
                 ax.loglog()
@@ -744,41 +766,52 @@ class Wings(HRCIPSF):
                     ax.set_xlabel('radius [arcsec]')
 
         ax.legend(fontsize='small', loc='lower left')
-        #fig.subplots_adjust(top=.95, right=.99, wspace=.2, hspace=.25)
-        fig.savefig(self.figpath(self.figures.keys()[0]))
+        fig.savefig(self.figpath(list(self.figures.keys())[0]),
+                    bbox_inches='tight')
 
     @base.Python
-    def step_21(self):
+    def step_31(self):
         '''Analyze and plot results - Plot 2'''
         import numpy as np
         from matplotlib import pyplot as plt
         from astropy.table import Table
-        from astropy.modeling import models, fitting
-        import saba
+        from astropy.modeling import models
+        from sherpa.data import Data1D
+        from sherpa.models.basic import Const1D, PowLaw1D
+        from sherpa.stats import Chi2
+        from sherpa.optmethods import LevMar
+        from sherpa.fit import Fit
 
-        powconst = models.PowerLaw1D + models.Const1D
-        fit_g = saba.SherpaFitter(statistic='chi2', optimizer='levmar')
+        # set up Sherpa fitting
+        const1d = Const1D()
+        const1d.c0.min = 0
+        pow1d = PowLaw1D()
+        stat = Chi2()
+        opt = LevMar()
+
         slopes = np.zeros((len(self.energy_bins) - 1, 3))
         for i in range(len(self.energy_bins) - 1):
             e = self.energy_bins[i]
             for j, name in enumerate(['obs', 'marx', 'saotrace']):
-                tab = Table.read('profile_{0:3.1f}_{1}.fits'.format(e, name))
+                tab = Table.read(f'profile_{e:3.1f}_{name}.fits', hdu=1)
                 r = np.mean(tab['R'], axis=1)
                 r_arcsec = r * 0.492
                 indfit = r_arcsec > 15.
                 if name == 'obs':
-                    mymod = powconst(amplitude_1=tab['SUR_FLUX'][-1],
-                                     bounds={'amplitude_1': (0, None)})
+                    mymod = const1d + pow1d
+                    const1d.c0.val = tab['SUR_FLUX'][-1]
                 else:
-                    mymod = models.PowerLaw1D()
-                # Multiply data values with 1e6 for numerical stability
-                g = fit_g(mymod, r[indfit], tab['SUR_FLUX'][indfit] * 1e6,
-                          err=tab['SUR_FLUX_ERR'][indfit] * 1e6)
+                    mymod = pow1d
+                data = Data1D('', r[indfit], tab['SUR_FLUX'][indfit],
+                              staterror=tab['SUR_FLUX_ERR'][indfit])
+                gfit = Fit(data, mymod, stat=stat, method=opt)
+                gfit.fit()
+
                 if name == 'obs':
-                    slopes[i, j] = g.alpha_0.value
+                    slopes[i, j] = pow1d.gamma.val
                 else:
-                    slopes[i, j] = g.alpha.value
-                print g
+                    slopes[i, j] = pow1d.gamma.val
+                print(gfit)
 
         fig = plt.figure()
         ax = fig.add_subplot(111)
@@ -788,7 +821,8 @@ class Wings(HRCIPSF):
             ax.legend()
             ax.set_xlabel('energy [keV]')
             ax.set_ylabel('slope of powerlaw')
-        fig.savefig(self.figpath(self.figures.keys()[1]))
+        fig.savefig(self.figpath(list(self.figures.keys())[1]),
+                    bbox_inches='tight')
 
 
 class CompMARXSAOTraceenergies(base.MarxTest):
@@ -912,14 +946,15 @@ class CompMARXSAOTraceenergies(base.MarxTest):
         for i, e in enumerate(self.parameter):
 
             for prog in ['marx', 'saomarx']:
-                tab = Table.read(os.path.join(self.basepath,
-                                              '{0}{1}.fits'.format(prog, e)),
-                                 hdu=1)
-                # The old question: Is an index the center of a pixel of the corner?
+                f = os.path.join(self.basepath, '{0}{1}.fits'.format(prog, e))
+                with fits.open(f) as hdus:
+                    header = hdus[1].header
+                tab = Table.read(f, hdu=1)
+                # The old question: Is an index the center of a pixel or the corner?
                 # Differs by 0.5...
-                d_ra = (tab['X'] - tab.meta['TCRPX9'] - 0.5) * tab.meta['TCDLT9'] * 3600.
+                d_ra = (tab['X'] - header['TCRPX9'] - 0.5) * header['TCDLT9'] * 3600.
                 # And do I count from the left or right (RA is reversed on the sky)?
-                d_dec = (tab['Y'] - tab.meta['TCRPX10'] + 0.5) * tab.meta['TCDLT10'] * 3600.
+                d_dec = (tab['Y'] - header['TCRPX10'] + 0.5) * header['TCDLT10'] * 3600.
 
                 if prog == 'marx':
                     offset = 0
@@ -934,8 +969,8 @@ class CompMARXSAOTraceenergies(base.MarxTest):
                                          0.5 * (im[2][1:] + im[2][:-1]),
                                          # for some reason, the data is
                                          # ordered for other orientation
-                                         im[0].T, levels=levels, colors='k',
-                                         origin=im[3].origin)
+                                         im[0].T, levels=levels, colors='k') #,
+                                         #origin=im[3].origin)
                 grid[i + offset].grid()
                 if prog == 'marx':
                     grid[i].text(-.5, .5, '{0} keV'.format(e))
@@ -957,7 +992,8 @@ class CompMARXSAOTraceenergies(base.MarxTest):
         grid[int(1.5 * offset)].set_xlabel('arcsec (measured from nominal source position)')
 
         fig.subplots_adjust(top=1, bottom=0, left=0.1, right=0.99)
-        fig.savefig(self.figpath(self.figures.keys()[0]))
+        fig.savefig(self.figpath(list(self.figures.keys())[0]),
+                    bbox_inches='tight')
 
     @base.Python
     def step_21(self):
@@ -973,14 +1009,16 @@ class CompMARXSAOTraceenergies(base.MarxTest):
         for i, e in enumerate(self.parameter):
 
             for prog in ['marx', 'saomarx']:
-                tab = Table.read(os.path.join(self.basepath,
-                                              '{0}{1}.fits'.format(prog, e)),
-                                 hdu=1)
+                f = os.path.join(self.basepath, '{0}{1}.fits'.format(prog, e))
+                with fits.open(f) as hdus:
+                    header = hdus[1].header
+
+                tab = Table.read(f, hdu=1)
                 # The old question: Is an index the center of a pixel of the corner?
                 # Differs by 0.5...
-                d_ra = (tab['X'] - tab.meta['TCRPX9'] - 0.5) * tab.meta['TCDLT9'] * 3600.
+                d_ra = (tab['X'] - header['TCRPX9'] - 0.5) * header['TCDLT9'] * 3600.
                 # Count from the left or right (RA is reversed on the sky)?
-                d_dec = (tab['Y'] - tab.meta['TCRPX10'] + 0.5) * tab.meta['TCDLT10'] * 3600.
+                d_dec = (tab['Y'] - header['TCRPX10'] + 0.5) * header['TCDLT10'] * 3600.
 
                 # The simulation is set up to make this simple: RA=DEC=0
                 # so cos(DEC) = 1 and we can approximate with Euklidian distance
@@ -998,7 +1036,7 @@ class CompMARXSAOTraceenergies(base.MarxTest):
         axecf.set_ylabel('encircled count fraction')
         axecf.set_xlabel('radius [arcsec]')
         axecf.set_xticks([0, .1, .2, .4, .6, .8, 1, 2, 3, 4, 5])
-        fig.savefig(self.figpath('ECF'))
+        fig.savefig(self.figpath('ECF'), bbox_inches='tight')
 
 
 class CompMARXSAOTraceoffaxis(CompMARXSAOTraceenergies):
@@ -1070,6 +1108,7 @@ class CompMARXSAOTraceoffaxis(CompMARXSAOTraceenergies):
         import numpy as np
         from matplotlib import pyplot as plt
         from astropy.table import Table
+        from astropy.io import fits
 
         ecf = [0.5, 0.7, 0.9]
         fig = plt.figure()
@@ -1079,14 +1118,15 @@ class CompMARXSAOTraceoffaxis(CompMARXSAOTraceenergies):
         for i, e in enumerate(self.parameter):
 
             for prog in ['marx', 'saomarx']:
-                tab = Table.read(os.path.join(self.basepath,
-                                              '{0}{1}.fits'.format(prog, e)),
-                                 hdu=1)
+                f = os.path.join(self.basepath, '{0}{1}.fits'.format(prog, e))
+                with fits.open(f) as hdus:
+                    header = hdus[1].header
+                tab = Table.read(f, hdu=1)
                 # The old question: Is an index the center of a pixel of the corner?
                 # Differs by 0.5...
-                d_ra = (tab['X'] - tab.meta['TCRPX9'] - 0.5) * tab.meta['TCDLT9'] * 3600.
+                d_ra = (tab['X'] - header['TCRPX9'] - 0.5) * header['TCDLT9'] * 3600.
                 # Count from the left or right (RA is reversed on the sky)?
-                d_dec = (tab['Y'] - tab.meta['TCRPX10'] + 0.5) * tab.meta['TCDLT10'] * 3600.
+                d_dec = (tab['Y'] - header['TCRPX10'] + 0.5) * header['TCDLT10'] * 3600.
 
                 # The simulation is set up to make this simple: RA=DEC=0
                 # so cos(DEC) = 1 and we can approximate with Euklidian distance
@@ -1106,4 +1146,4 @@ class CompMARXSAOTraceoffaxis(CompMARXSAOTraceenergies):
         axecf.set_ylabel('radius [arcsec]')
         axecf.set_xlabel('off-axis angle [arcmin]')
         axecf.grid()
-        fig.savefig(self.figpath('ECF'))
+        fig.savefig(self.figpath('ECF'), bbox_inches='tight')

@@ -298,8 +298,20 @@ int main (int a, char **b)
                          '-shared', 'pnts.c', '-o', 'pnts.so', '-fPIC',
                          '-I' + jdmath_h, jdmath_a])
 
-    @base.Marx
+    @base.Shell
     def step_7(self):
+        '''Unzip fits file.
+
+        MARX cannot read zipped fits files, so we need to unzip the .fits.gz asol
+        files that we downloaded from the archive. On the other hand, `CIAO`_
+        tools work on both zipped or unzipped files, so there is no need to
+        unzip all of them, just the files that MARX reads as input.
+        '''
+        asol = self.get_data_file('asol')
+        return [f'gunzip -f {asol}']
+
+    @base.Marx
+    def step_8(self):
         '''run marx USER source matching observation'''
         asol = self.get_data_file('asol')
         evt = self.get_data_file('evt2')
@@ -312,7 +324,7 @@ int main (int a, char **b)
         return pars
 
     @base.Marx2fits
-    def step_8(self):
+    def step_9(self):
         'turn into fits file'
         return '--pixadj=EDSER', 'COUP', 'COUP.fits'
 
@@ -324,7 +336,7 @@ int main (int a, char **b)
         simulating this here, so we just set the scaling limits to bring out
         the fainter details and ignore the bright peaks.
         '''
-        return ['''ds9 -log -cmap heat {0} COUP.fits -scale limits 0 2000 -frame 1 -regions command 'text 5:35:15 -5:22:09 # text=Observation font="helvetica 24"' -frame 2 -regions command 'text 5:35:15 -5:22:09 # text=MARX font="helvetica 24"' -region load src.fits -saveimage {1} -exit'''.format(self.get_data_file("evt2"), self.figpath(self.figures.keys()[0]))]
+        return ['''ds9 -log -cmap heat {0} COUP.fits -scale limits 0 2000 -frame 1 -regions command 'text 5:35:15 -5:22:09 # text=Observation font="helvetica 24"' -frame 2 -regions command 'text 5:35:15 -5:22:09 # text=MARX font="helvetica 24"' -region load src.fits -saveimage {1} -exit'''.format(self.get_data_file("evt2"), self.figpath(list(self.figures.keys())[0]))]
 
     @base.Ciao
     def step_11(self):
@@ -366,7 +378,7 @@ int main (int a, char **b)
         cbar1 = fig.colorbar(scat1, ax=ax1)
         cbar1.set_label('log(net counts per source)')
 
-        fig.savefig(self.figpath(self.figures.keys()[1]))
+        fig.savefig(self.figpath(list(self.figures.keys())[1]))
 
 
 class RegularGrid(base.MarxTest):
@@ -495,13 +507,13 @@ int main (int a, char **b)
     @base.Ciao
     def step_10(self):
         '''ds9 image of the PSF'''
-        return ['''ds9 -width 500 -height 500 -log -cmap heat points.fits -pan to 4097 4097 physical -zoom 0.5 -bin factor 2 -grid -saveimage {0} -exit'''.format(self.figpath(self.figures.keys()[0]))]
+        return ['''ds9 -width 500 -height 500 -log -cmap heat points.fits -pan to 4097 4097 physical -zoom 0.5 -bin factor 2 -grid -saveimage {0} -exit'''.format(self.figpath(list(self.figures.keys())[0]))]
 
     @base.Ciao
     def step_11(self):
         '''Source detection'''
         out = ['dmcopy "points.fits[EVENTS][bin x=3000:5100:2,y=3000:5100:2]" im.fits  option=image clobber=yes',
-                 'mkpsfmap im.fits psf.map 1.4 ecf=0.5',
+                 'mkpsfmap im.fits psf.map 1.4 ecf=0.5 clobber=yes',
           'celldetect im.fits src.fits psffile=psf.map clobber=yes'
                ]
         return out
@@ -552,7 +564,7 @@ int main (int a, char **b)
         cbar2 = fig.colorbar(scat2, ax=ax2)
         cbar2.set_label('net counts per source')
 
-        fig.savefig(self.figpath(self.figures.keys()[1]))
+        fig.savefig(self.figpath(list(self.figures.keys())[1]))
 
 
 class RegularGridHRCI(RegularGrid):
@@ -578,13 +590,13 @@ class RegularGridHRCI(RegularGrid):
     @base.Ciao
     def step_10(self):
         '''ds9 image of the PSF'''
-        return ['''ds9 -width 500 -height 500 -log -cmap heat points.fits -pan to 16392 16392 physical -bin factor 16 -grid -saveimage {0} -exit'''.format(self.figpath(self.figures.keys()[0]))]
+        return ['''ds9 -width 500 -height 500 -log -cmap heat points.fits -pan to 16392 16392 physical -bin factor 16 -grid -saveimage {0} -exit'''.format(self.figpath(list(self.figures.keys())[0]))]
 
     @base.Ciao
     def step_11(self):
         '''Source detection'''
         out = ['dmcopy "points.fits[EVENTS][bin x=8500:24500:8,y=8500:24500:8]" im.fits  option=image clobber=yes',
-                 'mkpsfmap im.fits psf.map 1.4 ecf=0.5',
+                 'mkpsfmap im.fits psf.map 1.4 ecf=0.5 clobber=yes',
           'celldetect im.fits src.fits psffile=psf.map clobber=yes'
                ]
         return out

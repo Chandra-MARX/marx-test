@@ -271,30 +271,24 @@ class SpectrumAbsPowACISS(base.MarxTest):
                 'chi2default': statres[1].rstat}}
 
         # Make the plots
-        plot_data(1)
-        plot_model(1, overplot=True)
-        set_curve({{'*.color': 'forest'}})
-        set_histogram({{'*.color': 'forest'}})
+        plot_data(1, color='g')
+        plot_model(1, overplot=True, color='g')
         fit(1)
         conf(1)
         c1 = get_conf_results()
         plot_model(1, overplot=True)
-        plot_data(2, overplot=True)
+        plot_data(2, overplot=True, yerrorbars=False, marker='^', color='orange')
         fit(2)
         conf(2)
         c2 = get_conf_results()
-        plot_model(2, overplot=True)
-        log_scale(X_AXIS)
-        log_scale(Y_AXIS)
-        set_curve({{'*.color': 'orange', 'err.*': 'false', 'symbol.style': 'uptriangle'}})
-        set_histogram(['*.color', 'orange'])
-        print_window('{out1}', ['export.clobber', 'True'])
+        plot_model(2, overplot=True, color='orange')
+        xscale("log")
+        yscale("log")
+        savefig('{out1}', bbox_inches='tight')
 
-        plot_arf(1)
-        set_histogram({{'*.color': 'forest'}})
-        plot_arf(2, overplot=True)
-        set_histogram(['*.color', 'orange'])
-        print_window('{out2}', ['export.clobber', 'True'])
+        plot_arf(1, color='g')
+        plot_arf(2, overplot=True, color='orange')
+        savefig('{out2}', bbox_inches='tight')
 
         # compile conf outputs for saving
         out['fitmarx'] = {{'parnames': c1.parnames,
@@ -323,8 +317,8 @@ class SpectrumAbsPowACISS(base.MarxTest):
 
         '''.format(srcstring=self.input_model2Sherpa(),
                    srcstring2=self.input_model['set_source2'],
-                   out1=self.figpath(self.figures.keys()[0]),
-                   out2=self.figpath(self.figures.keys()[1]),
+                   out1=self.figpath(list(self.figures.keys())[0]),
+                   out2=self.figpath(list(self.figures.keys())[1]),
                    sherpaout=os.path.join(self.basepath, 'sherpaout.json'))
         return dedent(sherpa)
 
@@ -391,7 +385,6 @@ class SpectrumAbsPowACISS_offaxis(SpectrumAbsPowACISS):
                 'SourceDEC': 40.1508083,
                 }
         return pars
-
 
 
 class SpectrumAPECACISI(SpectrumAbsPowACISS):
