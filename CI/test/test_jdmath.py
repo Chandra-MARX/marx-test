@@ -1,3 +1,10 @@
+# Licensed under GPL 2 - see LICENSE file
+"""Test the C interface to the jdmath library
+
+Tests here interface directly at the C level to check that math
+functions directly.
+Tests are not complete, but are added as work is done on the library.
+"""
 from os import path
 from tempfile import TemporaryDirectory
 import shutil

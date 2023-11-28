@@ -1,3 +1,12 @@
+# Licensed under GPL 2 - see LICENSE file
+"""Test for different build-in marx sources.
+
+As with any Monte-Carlo code it is difficult to verify correctness
+with limited run time. Also, output changes as the CALDB information
+that is used by marx is updated. To avoid having to update the tests
+every time the CALDB is updated, many of the numerical comparisons
+are relatively loose.
+"""
 from contextlib import chdir
 import gzip
 import shutil
@@ -11,16 +20,19 @@ import pycrates
 from ciao_contrib import runtool as rt
 from ciao_contrib.cda.data import download_chandra_obsids
 
-def test_point_source_no_grating(tmp_path, marxpar):
+from .utils import check_no_warnings
+
+def test_point_source_no_grating(tmp_path):
     """Some consistency checks of the default setup."""
-    shutil.copyfile(marxpar / 'marx.par', tmp_path / 'marx.par')
     with chdir(tmp_path):
         out = subprocess.run(['marx', 'GratingType=NONE', "Verbose=2"],
                               capture_output=True, check=True)
         assert 'hrma/corr_3.dat' in out.stdout.decode('utf-8')
+        check_no_warnings(out)
 
         out = subprocess.run(['marx2fits', '--pixadj=EDSER', 'point',  'point.fits'],
                               check=True, capture_output=True)
+        check_no_warnings(out)
 
         r = pycrates.read_file('point.fits')
         x = r.get_column('x').values
@@ -35,7 +47,7 @@ def test_point_source_no_grating(tmp_path, marxpar):
         assert 25 < y.std() < 45
 
 
-def test_S_IMAGE_position(tmp_path, marxpar):
+def test_S_IMAGE_position(tmp_path):
     """Check the position of an image source.
     
     This test uses an input image where only a single pixel is non-zero.
@@ -44,7 +56,6 @@ def test_S_IMAGE_position(tmp_path, marxpar):
     """
     data_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data'))
 
-    shutil.copyfile(marxpar / 'marx.par', tmp_path / 'marx.par')
     with chdir(tmp_path):
         assert download_chandra_obsids([7901], filetypes='asol')
         
@@ -54,7 +65,7 @@ def test_S_IMAGE_position(tmp_path, marxpar):
             with open(asol.replace('.gz', ''), 'wb') as f_out:
                 shutil.copyfileobj(f_in, f_out)
         
-        subprocess.run(['marx',
+        out = subprocess.run(['marx',
                         'ExposureTime=37144.58925002813',
                         'OutputDir=delta_out',
                         'GratingType=NONE',
@@ -74,8 +85,12 @@ def test_S_IMAGE_position(tmp_path, marxpar):
                         'Roll_Nom=80.721746267494',
                         'ACIS_Frame_Transfer_Time=0',  # No read-out streak that would confuse the mean position],
         ],
-                              check=True)
-        subprocess.run(['marx2fits', '--pixadj=EDSER', 'delta_out',  'delta_out.fits'], check=True, capture_output=False)
+                              check=True, capture_output=True)
+        check_no_warnings(out)
+        out = subprocess.run(['marx2fits', '--pixadj=EDSER',
+                              'delta_out',  'delta_out.fits'],
+                             check=True, capture_output=True)
+        check_no_warnings(out)
 
         r = pycrates.read_file('delta_out.fits[cols x,y]')
 
@@ -97,14 +112,13 @@ def test_S_IMAGE_position(tmp_path, marxpar):
     # assert pytest.approx(x_pix, abs=0.1) == r.get_column('x').values.mean()
     # assert pytest.approx(y_pix, abs=0.1) == r.get_column('y').values.mean()
 
-def test_error_outside_of_FOV(tmp_path, marxpar):
+def test_error_outside_of_FOV(tmp_path):
     """Check the position of an image source.
 
     This test uses an input image where only a single pixel is non-zero.
 
     See https://github.com/Chandra-MARX/marx/issues/50
     """
-    shutil.copyfile(marxpar / 'marx.par', tmp_path / 'marx.par')
     with chdir(tmp_path):
         out = subprocess.run(['marx',
                               'ExposureTime=1000',
@@ -119,6 +133,7 @@ def test_error_outside_of_FOV(tmp_path, marxpar):
         assert out.returncode == 1
         assert "Source is located at RA=195.900000, Dec=-24.200000 but nominal pointing is RA=25.000000 Dec=71.000000." in out.stderr.decode('utf-8')
         assert "Rays will not hit the telescope." in out.stderr.decode('utf-8')
+        check_no_warnings(out)
 
         # but IMAGE sources should work, because they have absolute WCS information
         data_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data'))
@@ -134,9 +149,10 @@ def test_error_outside_of_FOV(tmp_path, marxpar):
                               f'S-ImageFile={data_path}/one_pixel.img',
         ],
                               capture_output=True)
+        check_no_warnings(out)
 
 @pytest.mark.xfail(reason="known bug")
-def test_rayfiles(tmp_path, marxpar):
+def test_rayfiles(tmp_path):
     """Generate a rayfile and then use it with different detectors.
 
     In this example, we look at a relatively large, diffuse emission region
@@ -146,7 +162,6 @@ def test_rayfiles(tmp_path, marxpar):
     field-of-view; ACIS-I is less efficient for soft photons, but has a
     larger field-of-view.
     """
-    shutil.copyfile(marxpar / 'marx.par', tmp_path / 'marx.par')
     with chdir(tmp_path):
 
         outdump = subprocess.run(['marx',
@@ -160,6 +175,7 @@ def test_rayfiles(tmp_path, marxpar):
         assert 'Diffracting from HETG' not in outdump.stdout.decode('utf-8')
         assert 'Detecting with ACIS-S' not in outdump.stdout.decode('utf-8')
         assert 'Diffracting from HETG' not in outdump.stdout.decode('utf-8')
+        check_no_warnings(outdump)
         outi = subprocess.run(['marx',
                                'GratingType=NONE',
                                'SourceType=RAYFILE',
@@ -167,6 +183,7 @@ def test_rayfiles(tmp_path, marxpar):
                                'DetectorType=ACIS-I'],
                                capture_output=True, check=True)
         assert 'Detecting with ACIS-I' in outi.stdout.decode('utf-8')
+        check_no_warnings(outi)
         outs = subprocess.run(['marx',
                                'GratingType=NONE',
                                'SourceType=RAYFILE',
@@ -174,6 +191,7 @@ def test_rayfiles(tmp_path, marxpar):
                                'DetectorType=ACIS-S'],
                                capture_output=True, check=True)
         assert 'Detecting with ACIS-S' in outi.stdout.decode('utf-8')
+        check_no_warnings(outs)
         outg = subprocess.run(['marx',
                                'GratingType=LETG',
                                'SourceType=RAYFILE',
@@ -181,9 +199,11 @@ def test_rayfiles(tmp_path, marxpar):
                                'DetectorType=ACIS-S'],
                                capture_output=True, check=True)
         assert 'Detecting with ACIS-S' in outi.stdout.decode('utf-8')
+        check_no_warnings(outg)
         for dir in ['acisi', 'aciss', 'letg']:
-            subprocess.run(['marx2fits', '--pixadj=EXACT', dir,
-                            f'{dir}.fits'], check=True, capture_output=False)
+            out = subprocess.run(['marx2fits', '--pixadj=EXACT', dir,
+                            f'{dir}.fits'], check=True, capture_output=True)
+            check_no_warnings(out)
 
         acisi = pycrates.read_file(f'acisi.fits')
         aciss = pycrates.read_file(f'aciss.fits')
