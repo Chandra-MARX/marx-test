@@ -7,7 +7,7 @@ and have requirements that marx itself does not have. Thus, we have a separate t
 
 This splits into several parts:
 
-- `CI`: Relatively quick test that could (though that's not set up right now) be run on github actions for every PR to marx itself.
+- `CI`: Relatively quick test that could (though that's not set up right now) be run on github actions for every PR to marx itself. These test will check marx help messages, run a few simple simulations, etc. but do not include long simulations or grids of simulations wth millions of photons.
 - `speed`: A framework to compare marx runtimes with different compilers and compiler optimizations.
 - `notebooks`: A set of Jupyter notebooks that demonstrate how to use marx and how to compare marx with real data.
 - `tests`: Tests written using a separate test harness (which is defined in "marxtest"). Plan: Convert those to notebooks
