@@ -69,5 +69,9 @@ def test_verbosity(tmp_path):
                              check=True, capture_output=True))
     for o in out:
         check_no_warnings(o)
+    # Check that there is no errand output
+    # (as they are sometimes left behind from debugging)
+    assert len(out[0].stdout) == 0
+    # check that higher verbosity setting do something
     assert len(out[1].stdout) > len(out[0].stdout)
     assert len(out[2].stdout) > len(out[1].stdout)
