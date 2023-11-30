@@ -35,11 +35,9 @@ def obsid11005(tmp_path_factory):
 
 
 @pytest.fixture(scope="session")
-def default_marx_sim(tmp_path_factory, marxpar):
+def default_marx_sim(tmp_path_factory):
     """Provide output for a single marx simulation"""
     fn = tmp_path_factory.mktemp("sim")
-    for m in ['marx', 'marxasp', 'marxpileup']:
-        shutil.copyfile(marxpar / f'{m}.par', fn / f'{m}.par')
     with chdir(fn):
         out = subprocess.run(['marx'],
                     check=True, capture_output=True)
