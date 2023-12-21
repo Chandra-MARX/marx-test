@@ -12,6 +12,8 @@ import pytest
 from cffi import FFI
 import numpy as np
 
+from .utils import find_par_file
+
 @pytest.fixture(scope='module')
 def acis_ccode():
     # figure out where marx is installed and assume that libraries and include
@@ -38,6 +40,7 @@ def acis_ccode():
     ffibuilder.set_source("_acis_cffi",
         """
         #include "marx.h"   // the C header of the library
+
         // Usually, this is set up when the parameter file is read
         // but since we just pick and choose a few functions, we need to
         // set it up manually
@@ -73,7 +76,7 @@ def test_marx_map_energy_to_acis_pha_aciss(ccd_id, x, y, energy, expected, acis_
     # need to read a parameter file, because we need that as input
     # to marx_init_acis_s_rmf below
     marxpar = ffi.new("char[]",
-                      (os.environ['PFILES'] + "/marx.par").encode('utf-8'))
+                      (find_par_file('marx')).encode('utf-8'))
     mode = ffi.new("char[]", b"rwL")
     # program name "marx" is the first command line argument
     p = ffi.new("char[]", b"marx")    # p is a 'char *'
@@ -91,7 +94,7 @@ def test_acis_fef_gaussian_rmf(acis_ccode):
     # need to read a parameter file, because we need that as input
     # to marx_init_acis_s_rmf below
     marxpar = ffi.new("char[]",
-                      (os.environ['PFILES'] + "/marx.par").encode('utf-8'))
+                      (find_par_file("marx")).encode('utf-8'))
     mode = ffi.new("char[]", b"rwL")
     # program name "marx" is the first command line argument
     p = ffi.new("char[]", b"marx")    # p is a 'char *'

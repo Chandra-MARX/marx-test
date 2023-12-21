@@ -17,7 +17,9 @@ from test.utils import check_no_warnings
 def set_env():
     out = subprocess.run(['marx'], capture_output=True)
     if 'Unable to locate a marx.par parameter file' in out.stderr.decode('utf-8'):
-        os.environ['PFILES'] += ':' + out.stderr.decode('utf-8').split('\n')[4].strip()
+        os.environ['PFILES'] = out.stderr.decode('utf-8').split('\n')[4].strip() + \
+        ":" + os.environ['PFILES']
+        os.environ['PFILES'] = os.environ['PFILES'].replace(';', ':')
 
 
 @pytest.fixture(scope="session")
