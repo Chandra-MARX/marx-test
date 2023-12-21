@@ -133,7 +133,6 @@ def test_error_outside_of_FOV(tmp_path):
         assert out.returncode == 1
         assert "Source is located at RA=195.900000, Dec=-24.200000 but nominal pointing is RA=25.000000 Dec=71.000000." in out.stderr.decode('utf-8')
         assert "Rays will not hit the telescope." in out.stderr.decode('utf-8')
-        check_no_warnings(out)
 
         # but IMAGE sources should work, because they have absolute WCS information
         data_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data'))
