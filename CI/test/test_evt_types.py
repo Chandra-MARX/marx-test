@@ -5,7 +5,7 @@
 import subprocess
 from glob import glob
 import pycrates
-from utils import check_no_warnings
+from .utils import check_no_warnings
 
 def run_marx_sim(args: dict[str, str | float]) -> None:
     marxcall = [f'{k}={v}' for k, v in args.items()]

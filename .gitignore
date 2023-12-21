@@ -61,3 +61,6 @@ target/
 *~
 \#*\#
 *.DS_Store
+
+# intermediate CFFI generated files
+*_cffi.[co]

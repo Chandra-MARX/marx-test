@@ -23,7 +23,7 @@ from ciao_contrib.cda.data import download_chandra_obsids
 from .utils import check_no_warnings
 
 def test_point_source_no_grating(tmp_path):
-    """Some consistency checks of the default setup."""
+    """Some regression tests of the default setup."""
     with chdir(tmp_path):
         out = subprocess.run(['marx', 'GratingType=NONE', "Verbose=2"],
                               capture_output=True, check=True)
