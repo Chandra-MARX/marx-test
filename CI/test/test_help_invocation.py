@@ -32,7 +32,7 @@ def test_warning_asol_end(tmp_path, obsid11005):
     """Test output related to asol files
 
     - warning is raised if the asol file does not cover the entire exposure
-    - Message when trying to general an asol file for an observations that used FILE dither
+    - Message when trying to generate an asol file for an observations that used FILE dither
     """
     with chdir(tmp_path):
         out = subprocess.run(['marx', 'DitherModel=FILE',

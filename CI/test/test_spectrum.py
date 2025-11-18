@@ -48,7 +48,7 @@ def test_default_energy(default_marx_sim):
 def test_absorbed_powerlaw_spectrum(tmp_path):
     """Simulate an absorbed powerlaw spectrum for a point source
 
-    Then use CIAO to extract and fit back that parameters.
+    Then use CIAO to extract and fit back parameters.
     This tests energy conversion, spectral shape, contamination,
     and output formats so it's pretty comprehensive.
     On the other hand, small changes (say, a slip by one bin)

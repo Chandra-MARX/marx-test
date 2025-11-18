@@ -188,9 +188,9 @@ def test_rayfiles(tmp_path):
         # For example, there is the scatter in the HRMA, etc.
         # I did not actually trace down all effects because that's not
         # needed for this test.
-        # A lsignificant fraction (~70%) of the photons in the rayfile never
+        # A significant fraction (~70%) of the photons in the rayfile never
         # hit the detector, because they never hit the mirror shells in the HRMA.
-        # Thus, is a small subset of photons that are available for detection and
+        # Thus, this is a small subset of photons that are available for detection and
         # many of those overlap between the two runs.
         marx_args = ['marx',
                      'GratingType=NONE',
