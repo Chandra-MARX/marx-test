@@ -64,3 +64,15 @@ target/
 
 # intermediate CFFI generated files
 *_cffi.[co]
+
+# Files generated when running the notebooks in place
+# This should probably be done better with a temp directory
+# but in convenient during development.
+notebooks/*.fits
+notebooks/*.output
+notebooks/*.c
+notebooks/*.h
+notebooks/*.so
+notebooks/*/*dat
+notebooks/*/*par
+notebooks/[0-9]*
