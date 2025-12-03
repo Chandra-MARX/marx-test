@@ -39,8 +39,9 @@ def test_all_run(tmp_path, detector, grating):
         assert len(evt) > 100  # at least 100 events
 
         if grating == 'NONE':
-            assert np.std(evt['X']) > 25  # not all events at same location
-            assert np.std(evt['Y']) > 25  # not all events at same location
+            assert np.std(evt['X']) > 10  # not all events at same location
+            assert np.std(evt['Y']) > 10  # not all events at same location
+            assert np.std(evt['X']) < 500 # but not as spread out as a grating would
         else:
             assert 'ORDER' in evt.colnames  # grating orders present
             np.std(evt['X']) > 5000

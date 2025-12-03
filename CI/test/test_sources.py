@@ -83,7 +83,7 @@ def test_S_IMAGE_position(tmp_path):
                         'SourceType=IMAGE',
                         f'S-ImageFile={data_path}/one_pixel.img',
                         'DitherModel=FILE',
-                        f'DitherFile={asol.replace(".gz", "")}',
+                        f'DitherFile={asol.removesuffix(".gz")}',
                         'DetOffsetX=0.001444942264670734',
                         'DetOffsetZ=-0.01005726120280315',
                         'RA_Nom=195.93423610867',
@@ -133,7 +133,7 @@ def test_error_outside_of_FOV(tmp_path):
                               'SourceType=POINT',
                               'RA_Nom=25.',
                               'Dec_Nom=71.',
-                              'Roll_Nom=80.7',
+
         ],
                               capture_output=True)
         assert out.returncode == 1
@@ -146,10 +146,8 @@ def test_error_outside_of_FOV(tmp_path):
                               'ExposureTime=1000',
                               'SourceRA=195.9',
                               'SourceDEC=-24.2',
-                              'SourceType=POINT',
                               'RA_Nom=25.',
                               'Dec_Nom=71.',
-                              'Roll_Nom=80.7',
                               'SourceType=IMAGE',
                               f'S-ImageFile={data_path}/one_pixel.img',
         ],
@@ -189,7 +187,7 @@ def test_rayfiles(tmp_path):
         # I did not actually trace down all effects because that's not
         # needed for this test.
         # A significant fraction (~70%) of the photons in the rayfile never
-        # hit the detector, because they never hit the mirror shells in the HRMA.
+        # hits the detector, because they never hit the mirror shells in the HRMA.
         # Thus, this is a small subset of photons that are available for detection and
         # many of those overlap between the two runs.
         marx_args = ['marx',

@@ -9,6 +9,7 @@ def check_no_warnings(out: subprocess.CompletedProcess) -> None:
     assert 'WARNING' not in out.stdout.decode('utf-8')
     assert 'Warning' not in out.stdout.decode('utf-8')
     assert len(out.stderr) == 0
+    assert out.returncode == 0
 
 def find_par_file(stem: str='marx') -> str:
     """Find the location of the marx.par file
