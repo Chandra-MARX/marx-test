@@ -42,6 +42,9 @@ def test_warning_asol_end(tmp_path, obsid11005):
                               'GratingType=LETG',
                               # Make the simulation run fast, don't need many photons
                               'SourceFlux=0.001',
+                              # Close to the pointing that's defined in the dither file
+                              'SourceRA=188.',
+                              'SourceDec=-41.'
                               ],
                              check=True, capture_output=True)
         outasp = subprocess.run(['marxasp'],

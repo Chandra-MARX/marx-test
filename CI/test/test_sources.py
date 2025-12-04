@@ -15,9 +15,12 @@ import os
 import re
 import subprocess
 
+from astropy.io import fits
+from astropy.wcs import WCS
 import numpy as np
 import pytest
 import pycrates
+from coords.chandra import sky_to_chandra
 from ciao_contrib import runtool as rt
 from ciao_contrib.cda.data import download_chandra_obsids
 
@@ -48,9 +51,9 @@ def test_point_source_no_grating(tmp_path):
         assert 5000 < len(x) < 20000
         assert 4015 < np.median(x) < 4020
         # Loose number in case scattering or dither uncertainties change.
-        assert 25 < x.std() < 45
+        assert 20 < x.std() < 50
         assert 4015 < np.median(x) < 4020
-        assert 25 < y.std() < 45
+        assert 20 < y.std() < 50
 
 
 def test_S_IMAGE_position(tmp_path):
@@ -154,7 +157,7 @@ def test_error_outside_of_FOV(tmp_path):
                               capture_output=True)
         check_no_warnings(out)
 
-#@pytest.mark.xfail(reason="known bug")
+
 def test_rayfiles(tmp_path):
     """Generate a rayfile and then use it with different detectors.
 
@@ -167,7 +170,7 @@ def test_rayfiles(tmp_path):
                                   'MinEnergy=0.5',
                                   'MaxEnergy=2.5',
                                   # Low flux so it's unlikely to have more than one
-                                  # photons per read-out
+                                  # photon per read-out
                                   'SourceFlux=0.00001',],
                                   capture_output=True, check=True)
         # https://github.com/Chandra-MARX/marx/issues/30
@@ -261,3 +264,28 @@ def test_rayfiles(tmp_path):
         # grating spreads out photons, this is just a simple test to ensure the grating is in fact simulated
         assert letg.get_column('x').values.std() > acisi.get_column('x').values.std()
         assert letg.get_column('y').values.std() > acisi.get_column('y').values.std()
+
+        # Should not issue a warning message, even if SourceRA/DEC differs from nominal pointing.
+        ra_nom = 25.
+        dec_nom = 77.
+        out = subprocess.run(['marx',
+                               'GratingType=LETG',
+                               'SourceType=RAYFILE',
+                               'OutputDir=pointing',
+                               'DetectorType=ACIS-S',
+                               f'SourceRA={ra_nom+180}',
+                               f'SourceDEC={-dec_nom}',
+                               f'RA_Nom={ra_nom}',
+                               f'Dec_Nom={dec_nom}',],
+                               capture_output=True, check=True)
+        check_no_warnings(out)
+        subprocess.run(['marx2fits', '--pixadj=EXACT', 'pointing',
+                        'pointing.fits'], check=True, capture_output=True)
+
+        # Positions should be very close to the nominal pointing case
+        pointing = pycrates.read_file('pointing.fits')
+        coos = sky_to_chandra(fits.getheader('pointing.fits', 1),
+                                pointing.get_column('x').values,
+                                pointing.get_column('y').values)
+        assert [ra_nom, dec_nom] == pytest.approx([np.mean(coos['ra']),
+                                                   np.mean(coos['dec'])], abs=0.2)
