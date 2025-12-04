@@ -16,13 +16,12 @@ import re
 import subprocess
 
 from astropy.io import fits
-from astropy.wcs import WCS
 import numpy as np
 import pytest
 import pycrates
 from coords.chandra import sky_to_chandra
-from ciao_contrib import runtool as rt
 from ciao_contrib.cda.data import download_chandra_obsids
+from ciao_contrib import runtool as rt
 
 from .utils import check_no_warnings
 
@@ -103,25 +102,65 @@ def test_S_IMAGE_position(tmp_path):
 
         r = pycrates.read_file('delta_out.fits[cols x,y]')
 
-    assert pytest.approx(4096.5, abs=0.1) == r.get_column('x').values.mean()
-    assert pytest.approx(4096.5, abs=0.1) == r.get_column('y').values.mean()
+    rt.dmstat(f'{data_path}/one_pixel.img')
+    x_pix, y_pix = rt.dmstat.out_cntrd_phys.split(',')
+    x_pix = float(x_pix)
+    y_pix = float(y_pix)
+    assert pytest.approx(x_pix, abs=0.1) == r.get_column('x').values.mean()
+    assert pytest.approx(y_pix, abs=0.1) == r.get_column('y').values.mean()
 
-    # One might assume that the statements below hold, but IMAGE source
-    # does not actually use the full WCS, it only pulls out the pixel size.
-    # Since the WCS in this case has a negative scale in one dimension,
-    # the image appears flipped. For a pixel close to the center, the difference
-    # is not large, but real.
-    # So, this is a text of existing behavior, which matches what's documented.
-    # See https://github.com/Chandra-MARX/marx/issues/50 for more discussion.
-    #
-    # rt.dmstat(f'{data_path}/one_pixel.img')
-    # x_pix, y_pix = rt.dmstat.out_cntrd_phys.split(',')
-    # x_pix = float(x_pix)
-    # y_pix = float(y_pix)
-    # assert pytest.approx(x_pix, abs=0.1) == r.get_column('x').values.mean()
-    # assert pytest.approx(y_pix, abs=0.1) == r.get_column('y').values.mean()
 
-def test_error_outside_of_FOV(tmp_path):
+def test_image_rotation(tmp_path):
+    data_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data'))
+
+    with chdir(tmp_path):
+        assert download_chandra_obsids([7901], filetypes='asol')
+
+        # marx does not read gz files, so unzip
+        asol = glob.glob('*/primary/*asol1.fits.gz')[0]
+        with gzip.open(asol, 'rb') as f_in:
+            with open(asol.replace('.gz', ''), 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
+
+        out = subprocess.run(['marx',
+                        'ExposureTime=37144.58925002813',
+                        'OutputDir=asym_shape',
+                        'GratingType=NONE',
+                        'SourceFlux=0.01',
+                        'MinEnergy=1',
+                        'MaxEnergy=1',
+                        'SourceRA=195.9341611742938',
+                        'SourceDEC=-24.22948889322631',
+                        'SourceType=IMAGE',
+                        f'S-ImageFile={data_path}/asym_shape.img',
+                        'DitherModel=FILE',
+                        f'DitherFile={asol.removesuffix(".gz")}',
+                        # Note:
+                        # Compared to test_S_IMAGE_position we do no give
+                        # DetOffsetX/Z and RA/Dec/roll nom here.
+                        # These are taken from the asol file directly.
+                        'ACIS_Frame_Transfer_Time=0',  # No read-out streak that would confuse the mean position],
+        ],
+                              check=True, capture_output=True)
+        check_no_warnings(out)
+        out = subprocess.run(['marx2fits', '--pixadj=EDSER',
+                              'asym_shape',  'asym_shape.fits'],
+                             check=True, capture_output=True)
+        check_no_warnings(out)
+        # Bin with the same specification that were used to generate the input image
+        rt.dmcopy('asym_shape.fits[bin sky=4046.5:4146.5:1]', 'asym_shape_cut.fits', clobber=True, opt='image')
+        # Threshold such that the image only has 1 and 0, like the input image
+        rt.dmimgthresh('asym_shape_cut.fits', 'new.img', cut="50%")
+        rt.dmimgthresh('new.img', 'new2.img', cut=":50%", value=1)
+
+        # compare pixel by pixel
+        orig = pycrates.read_file(f'{data_path}/asym_shape.img')
+        new = pycrates.read_file('new2.img')
+        assert orig.get_image().values == pytest.approx(new.get_image().values)
+
+
+@pytest.mark.parametrize("SourceType", ["POINT", "IMAGE"])
+def test_error_outside_of_FOV(tmp_path, SourceType):
     """Check the position of an image source.
 
     This test uses an input image where only a single pixel is non-zero.
@@ -133,7 +172,7 @@ def test_error_outside_of_FOV(tmp_path):
                               'ExposureTime=1000',
                               'SourceRA=195.9',
                               'SourceDEC=-24.2',
-                              'SourceType=POINT',
+                              f'SourceType={SourceType}',
                               'RA_Nom=25.',
                               'Dec_Nom=71.',
 
@@ -142,20 +181,6 @@ def test_error_outside_of_FOV(tmp_path):
         assert out.returncode == 1
         assert "Source is located at RA=195.900000, Dec=-24.200000 but nominal pointing is RA=25.000000 Dec=71.000000." in out.stderr.decode('utf-8')
         assert "Rays will not hit the telescope." in out.stderr.decode('utf-8')
-
-        # but IMAGE sources should work, because they have absolute WCS information
-        data_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data'))
-        out = subprocess.run(['marx',
-                              'ExposureTime=1000',
-                              'SourceRA=195.9',
-                              'SourceDEC=-24.2',
-                              'RA_Nom=25.',
-                              'Dec_Nom=71.',
-                              'SourceType=IMAGE',
-                              f'S-ImageFile={data_path}/one_pixel.img',
-        ],
-                              capture_output=True)
-        check_no_warnings(out)
 
 
 def test_rayfiles(tmp_path):
