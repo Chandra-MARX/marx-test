@@ -23,21 +23,17 @@ how well the simulations are doing.
 .. toctree::
    :maxdepth: 2
 
-   {% for module in modulelist %}{{ module }}
-   {% endfor %}
+   PSF.ipynb
+   PSF_wings.ipynb
+   Grades.ipynb
+   spectrum.ipynb
+   source.ipynb
+   positions.ipynb
 
-The code to run all these tests is available and linked below. Advanced users
+The code to run all these tests is available in the notebooks. Advanced users
 may wish to inspect the code of the tests for some more ideas on how to use
 |marx|. The code is lightly commented, but not in as much details as :ref:`examples`.
 It will not execute as-is on your computer because it depends on the
 local ``$PATH`` and other environment variables. For example, we use Python
 scripts to set up a directory structure, download Chandra
-data, initialize `CIAO`_ etc. See `<https://github.com/Chandra-MARX/marx-test>`_
-for the full code to run all tests.
-
-
-.. toctree::
-   :maxdepth: 2
-
-   listofcode
-
+data, initialize `CIAO`_ etc.

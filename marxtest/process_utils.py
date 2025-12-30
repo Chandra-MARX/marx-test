@@ -149,7 +149,7 @@ def spectrum_from_fluxcorrection(conf, asolfile, evtfile, x, y, region,
     evtfile : string
         Path and filename of evt2 file
     x, y : float
-        x, y position of source in detector coordiantes
+        x, y position of source in detector coordinates
     region : string
         CIAO region for source extraction
     psffrac : float
@@ -206,4 +206,6 @@ awk '{{ sub(/\\# ENERG_LO/,"ENERG_LO"); print }}' < input_spec_saotrace.tbl > in
 # Then, replace spaces with tabs
 tr ' ' \\\\t < input_spec_saotrace.temp > input_spec_saotrace.rdb
 
-'''.format(det='ACIS-{0}'.format(ccd_id), grating=evt['GRATING'], evtfile=evtfile, x=x, y=y, asolfile=asolfile, region=region, psffrac=psffrac, exptime=evt['TSTOP'] - evt['TSTART']).split('\n')
+'''.format(det='ACIS-{0}'.format(ccd_id), grating=evt['GRATING'], evtfile=evtfile,
+            x=x, y=y, asolfile=asolfile, region=region, psffrac=psffrac,
+            exptime=evt['TSTOP'] - evt['TSTART']).split('\n')

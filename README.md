@@ -16,9 +16,19 @@ This splits into several parts:
 ## Notes on the CI tests
 The tests in CI are meant to be run as continuous integration. They are in no way complete, but tests get added
 when work on the C code happens, so they are testing any changes compared to marx circa marx 5.0.
-The are to be run with the pytest framework, and they need marx in the path as well as an activated CIAO in 
-the environment. 
+The are to be run with the pytest framework, and they need marx in the path as well as an activated CIAO in
+the environment.
 Several of those tests go directly into the C code and use [cffi](https://cffi.readthedocs.io/en/stable/) to test individual C functions in marx or jdfits. This is a bit brittle, in the sense that it depends on the OS and compiler options. A few incomplete notes are below:
 
 - On Linux with `gcc`, marx itself needs to be compiled with `-fPIC` to be able to load the shared library into the test. Even after doing that, I still run into `ImportError: /tmp/tmpp2lqsq9a/_acis_cffi.cpython-311-x86_64-linux-gnu.so: undefined symbol: PF_Errno` despite the `pfile` library being linked into the shared library. I've not debugged this further. I suspect that the age of the marx makefiles leads to settings that are non-standard today (and marx was never meant to be used as shared library), but since the tests pass on MacOS and the tests that call marx as a binary (instead of linking to it as a shared library) work, I have not pursued this further.
 - On MacOS with `clang`, the tests work with default compiler options.
+
+## Notes on running saotrace in a container
+
+https://cxc.cfa.harvard.edu/cal/Hrma/SAOTrace/Install.html#Container_Image
+
+```
+podman machine start
+podman image load -i saotrace-container-image-2.0.6.1.tar.gz
+./run-saotrace trace-nest
+```

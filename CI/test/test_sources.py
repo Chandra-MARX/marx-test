@@ -111,6 +111,11 @@ def test_S_IMAGE_position(tmp_path):
 
 
 def test_image_rotation(tmp_path):
+    """Test an input image that is not symmetric.
+
+    We bin the output image with the same DM specification as used for the input
+    image, that way we get exactly matching pixels and can do a pixel-by-pixel comparison.
+    """
     data_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data'))
 
     with chdir(tmp_path):
